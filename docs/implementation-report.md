@@ -93,3 +93,27 @@ and streaming GGUF conversion contract.
 
 Next: finish official RNG/seed parity and implement the versioned Cantor ABI v1
 stage boundaries before real-model GPU validation.
+
+## 2026-08-23 — official position-addressed RNG contract
+
+- Replaced the imported runtime's shared CUDA-style AR/RVQ random stream with
+  SGLang 0.5.16's backend-independent MurmurHash3/Gumbel-max sampler. The
+  public seed is first reduced with the pinned `minimax-ttm-ar` BLAKE2b
+  namespace, and every draw is addressed by `(seed, frame * 8 + codebook,
+  compact_vocab_column)`. This preserves results across batch size and GGML
+  CPU/CUDA/HIP/Vulkan/Metal implementations.
+- Matched SGLang's compact semantic column order (`audio_end` at column zero,
+  then 16,384 semantic codes) even though the local readback buffer stores the
+  token range first.
+- Flow noise now uses the exact personalized BLAKE2b derivation
+  `(base_seed, "dit", chunk_index)` and resets the PyTorch-compatible Philox
+  cursor for each acoustic window. An explicitly supplied flow seed is the
+  base; otherwise the request seed is used.
+- Guidance scale zero is accepted consistently with the public schema and the
+  pinned acoustic server.
+- Added independent seed/hash test vectors generated from the pinned Python
+  code. The full native CPU build, all eight tests, and the GGML compute smoke
+  pass.
+
+Next: expose replayable AR, projected-condition, resumable Euler, and decode
+boundaries through the unchanged Cantor engine ABI v1.

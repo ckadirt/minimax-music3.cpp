@@ -85,6 +85,8 @@ struct MiniMaxMusic3Request {
     float ar_guidance_scale = 1.5F;
     int64_t top_k = 50;
     uint64_t seed = 0;
+    uint64_t flow_seed = 0;
+    bool flow_seed_present = false;
 };
 
 }  // namespace engine::models::minimax_music3

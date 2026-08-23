@@ -154,6 +154,7 @@ runtime::ModelCliInterface minimax_music3_cli_interface() {
         {"ar_guidance_scale", "float", "Autoregressive semantic and depth CFG scale.", false, "1.5", "0.0"},
         {"top_k", "int", "Top-k sampling for semantic and residual code sampling.", false, "50", "1"},
         {"seed", "int", "Generation seed.", false, "0", "0"},
+        {"flow_seed", "int", "Optional base seed for per-chunk DIT noise.", false, "", "0"},
     };
     out.session_options = {
         {"minimax_music3.weight_type", "native|bf16|f16|q8_0|q4_0|q4_k", "Shared weight storage type.", false, "native"},
@@ -273,6 +274,10 @@ MiniMaxMusic3Request MiniMaxMusic3Session::parse_request(const runtime::TaskRequ
     }
     if (const auto value = runtime::parse_u64_option(request.options, {"seed"})) {
         out.seed = *value;
+    }
+    if (const auto value = runtime::parse_u64_option(request.options, {"flow_seed"})) {
+        out.flow_seed = *value;
+        out.flow_seed_present = true;
     }
     return out;
 }

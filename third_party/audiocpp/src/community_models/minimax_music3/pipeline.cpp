@@ -1,4 +1,5 @@
 #include "engine/community_models/minimax_music3/pipeline.h"
+#include "engine/community_models/minimax_music3/seed.h"
 
 #include "engine/framework/debug/profiler.h"
 #include "engine/framework/sampling/hf_sampler.h"
@@ -114,8 +115,8 @@ struct MiniMaxMusic3PipelineRuntime::Impl {
         if (request.num_inference_steps <= 0) {
             throw std::runtime_error("MiniMax Music 3 num_inference_steps must be positive");
         }
-        if (request.guidance_scale <= 0.0F || request.ar_guidance_scale <= 0.0F) {
-            throw std::runtime_error("MiniMax Music 3 guidance scales must be positive");
+        if (request.guidance_scale < 0.0F || request.ar_guidance_scale < 0.0F) {
+            throw std::runtime_error("MiniMax Music 3 guidance scales must be non-negative");
         }
         if (request.top_k <= 0) {
             throw std::runtime_error("MiniMax Music 3 top_k must be positive");
@@ -123,11 +124,11 @@ struct MiniMaxMusic3PipelineRuntime::Impl {
         const int64_t target_frames = std::min<int64_t>(
             assets->config.max_audio_frames,
             static_cast<int64_t>(request.duration_sec * static_cast<double>(assets->config.frame_rate)));
-        uint64_t rng_offset_blocks = 0;
+        uint64_t ar_rng_offset_blocks = 0;
         std::vector<float> frame_hiddens;
         {
             auto & ar_runtime = ensure_ar();
-            frame_hiddens = ar_runtime.generate_frame_hiddens(request, target_frames, rng_offset_blocks);
+            frame_hiddens = ar_runtime.generate_frame_hiddens(request, target_frames, ar_rng_offset_blocks);
             release_ar_after_phase();
         }
         const int64_t generated_frames =
@@ -171,22 +172,25 @@ struct MiniMaxMusic3PipelineRuntime::Impl {
                 std::vector<float> carry_condition;
                 std::vector<float> carry_latent;
                 const auto flow_start = Clock::now();
+                auto chunk_request = request;
+                const std::uint64_t flow_base_seed = request.flow_seed_present
+                    ? request.flow_seed
+                    : request.seed;
+                chunk_request.seed = derive_dit_chunk_seed(flow_base_seed, chunk_index);
+                std::uint64_t chunk_rng_offset_blocks = 0;
                 auto latents = flow_runtime.denoise_chunk(
                     condition_values,
                     condition_frames,
                     previous_latent,
                     previous_condition,
-                    request,
-                    rng_offset_blocks,
+                    chunk_request,
+                    chunk_rng_offset_blocks,
                     sampling_policy,
                     carry_condition,
                     carry_latent);
                 engine::debug::timing_log_scalar(
                     "minimax_music3.flow.total_ms",
                     engine::debug::elapsed_ms(flow_start, Clock::now()));
-                rng_offset_blocks += sampling::torch_cuda_tensor_iterator_offset_blocks(
-                    static_cast<uint64_t>(latents.size()),
-                    sampling_policy);
                 previous_latent = std::move(carry_latent);
                 previous_condition = std::move(carry_condition);
                 denoised.push_back({std::move(latents), condition_frames});

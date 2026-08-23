@@ -102,6 +102,9 @@ void generate_wav(const generation_request & request, const generation_options &
         {"top_k", std::to_string(request.top_k)},
         {"seed", std::to_string(request.seed)},
     };
+    if (request.flow_seed_present) {
+        native_request.options["flow_seed"] = std::to_string(request.flow_seed);
+    }
     auto result = offline->run(native_request);
     if (!result.audio_output.has_value()) throw std::runtime_error("MiniMax runtime returned no audio");
     auto audio = std::move(*result.audio_output);

@@ -1,4 +1,5 @@
 #include "engine/community_models/minimax_music3/ar_runtime.h"
+#include "engine/community_models/minimax_music3/seed.h"
 
 #include "engine/framework/debug/profiler.h"
 #include "engine/framework/modules/transformers/qwen_causal_decode_runtime.h"
@@ -8,7 +9,6 @@
 #include <chrono>
 #include <cmath>
 #include <limits>
-#include <random>
 #include <stdexcept>
 #include <utility>
 
@@ -89,9 +89,7 @@ int32_t sample_compact_semantic_token(
     std::vector<double> & weights,
     const MiniMaxMusic3Request & request,
     uint64_t & sample_call_index,
-    uint64_t & rng_offset_blocks,
-    const sampling::TorchCudaSamplingPolicy & sampling_policy,
-    std::mt19937 & fallback_rng) {
+    uint64_t & rng_offset_blocks) {
     const int64_t compact_size = prompt.semantic_vocab_size + 1;
     if (vocab_size <= 0 || static_cast<int64_t>(batch2_logits.size()) != 2 * compact_size) {
         throw std::runtime_error("MiniMax Music 3 compact AR logits branch size mismatch");
@@ -138,39 +136,24 @@ int32_t sample_compact_semantic_token(
         throw std::runtime_error("MiniMax Music 3 compact semantic sampler has no finite logits");
     }
     weights.reserve(candidates.size());
+    std::vector<std::uint32_t> columns;
+    columns.reserve(candidates.size());
     for (const int32_t index : candidates) {
-        weights.push_back(std::exp(static_cast<double>(logits[static_cast<size_t>(index)] - max_score)));
+        weights.push_back(static_cast<double>(logits[static_cast<size_t>(index)]));
+        columns.push_back(index == prompt.semantic_vocab_size
+            ? 0U
+            : static_cast<std::uint32_t>(index + 1));
     }
-
-    int32_t selected_compact = -1;
-    if (sampling_policy.cuda_fast_path) {
-        double best_rank = -std::numeric_limits<double>::infinity();
-        for (size_t i = 0; i < candidates.size(); ++i) {
-            const int32_t global_token = compact_semantic_token_id(prompt, candidates[i]);
-            const float exponential = sampling::torch_cuda_tensor_iterator_exponential_element_at_offset(
-                request.seed,
-                static_cast<uint64_t>(vocab_size),
-                static_cast<uint64_t>(global_token),
-                rng_offset_blocks,
-                sampling_policy.multiprocessor_count,
-                sampling_policy.max_threads_per_multiprocessor);
-            const double rank = weights[i] / static_cast<double>(exponential);
-            if (rank > best_rank) {
-                best_rank = rank;
-                selected_compact = candidates[i];
-            }
-        }
-    } else {
-        std::discrete_distribution<size_t> distribution(weights.begin(), weights.end());
-        selected_compact = candidates[distribution(fallback_rng)];
-    }
-    if (selected_compact < 0) {
-        throw std::runtime_error("MiniMax Music 3 compact semantic sampler failed to select a token");
-    }
+    std::vector<float> scores(weights.begin(), weights.end());
+    const auto selected = seeded_gumbel_argmax(
+        scores,
+        derive_ar_sampling_seed(request.seed),
+        static_cast<std::uint32_t>(sample_call_index),
+        &columns);
+    const int32_t selected_compact = candidates[selected];
     ++sample_call_index;
-    rng_offset_blocks += sampling::torch_cuda_tensor_iterator_offset_blocks(
-        static_cast<uint64_t>(vocab_size),
-        sampling_policy);
+    (void)rng_offset_blocks;
+    (void)vocab_size;
     return compact_semantic_token_id(prompt, selected_compact);
 }
 
@@ -184,10 +167,8 @@ int32_t sample_semantic_token(
     const MiniMaxMusic3Request & request,
     uint64_t & sample_call_index,
     uint64_t & rng_offset_blocks,
-    const sampling::TorchCudaSamplingPolicy & sampling_policy,
     sampling::HfSamplerScratch & scratch,
-    std::vector<double> & weights,
-    std::mt19937 & fallback_rng) {
+    std::vector<double> & weights) {
     const int64_t compact_size = prompt.semantic_vocab_size + 1;
     if (static_cast<int64_t>(batch2_logits.size()) == 2 * compact_size) {
         return sample_compact_semantic_token(
@@ -200,9 +181,7 @@ int32_t sample_semantic_token(
             weights,
             request,
             sample_call_index,
-            rng_offset_blocks,
-            sampling_policy,
-            fallback_rng);
+            rng_offset_blocks);
     }
     if (vocab_size <= 0 || static_cast<int64_t>(batch2_logits.size()) != 2 * vocab_size) {
         throw std::runtime_error("MiniMax Music 3 AR logits branch size mismatch");
@@ -238,24 +217,31 @@ int32_t sample_semantic_token(
         }
     }
     sampling::HfLogitsProcessor::apply_top_k(logits, request.top_k, 1, scratch);
-    const sampling::HfTorchSamplingState torch_state{
-        &sampling_policy,
-        request.seed,
-        sample_call_index,
-        rng_offset_blocks,
-        true,
-    };
-    const int32_t token = sampling::HfTokenSampler::sample_from_processed_scores(
-        logits,
-        scratch,
-        fallback_rng,
-        sampling_policy.cuda_fast_path ? &torch_state : nullptr,
-        "MiniMax Music 3 semantic",
-        false);
+    compact_candidates.clear();
+    weights.clear();
+    std::vector<std::uint32_t> columns;
+    for (int64_t code = 0; code < count; ++code) {
+        const int64_t token = start + code;
+        if (!std::isfinite(logits[static_cast<std::size_t>(token)])) continue;
+        compact_candidates.push_back(static_cast<int32_t>(token));
+        weights.push_back(static_cast<double>(logits[static_cast<std::size_t>(token)]));
+        columns.push_back(static_cast<std::uint32_t>(code + 1));
+    }
+    if (prompt.audio_end_token_id >= 0 && prompt.audio_end_token_id < vocab_size &&
+        std::isfinite(logits[static_cast<std::size_t>(prompt.audio_end_token_id)])) {
+        compact_candidates.push_back(prompt.audio_end_token_id);
+        weights.push_back(static_cast<double>(logits[static_cast<std::size_t>(prompt.audio_end_token_id)]));
+        columns.push_back(0U);
+    }
+    std::vector<float> scores(weights.begin(), weights.end());
+    const auto selected = seeded_gumbel_argmax(
+        scores,
+        derive_ar_sampling_seed(request.seed),
+        static_cast<std::uint32_t>(sample_call_index),
+        &columns);
+    const int32_t token = compact_candidates[selected];
     ++sample_call_index;
-    rng_offset_blocks += sampling::torch_cuda_tensor_iterator_offset_blocks(
-        static_cast<uint64_t>(logits.size()),
-        sampling_policy);
+    (void)rng_offset_blocks;
     return token;
 }
 
@@ -305,13 +291,7 @@ struct MiniMaxMusic3ArRuntime::Impl {
               execution,
               graph_arena_bytes,
               weight_context_bytes,
-              storage_type)),
-          sampling_policy(sampling::resolve_torch_cuda_sampling_policy(
-              execution.backend_type(),
-              execution.config().device,
-              "minimax_music3.ar.sampling",
-              "MiniMax Music 3 AR",
-              sampling::TorchCudaSamplingPolicyFailureMode::FallbackToDefault)) {
+              storage_type)) {
         if (assets == nullptr) {
             throw std::runtime_error("MiniMax Music 3 AR runtime requires assets");
         }
@@ -366,7 +346,6 @@ struct MiniMaxMusic3ArRuntime::Impl {
         frame_hiddens.reserve(static_cast<size_t>(
             target_frames * assets->config.condition.condition_layers * assets->config.qwen.hidden_size));
         uint64_t sample_call_index = 0;
-        std::mt19937 fallback_rng(static_cast<uint32_t>(request.seed));
         for (int64_t frame = 0; frame <= target_frames; ++frame) {
             const int32_t token = sample_semantic_token(
                 prompt,
@@ -378,10 +357,8 @@ struct MiniMaxMusic3ArRuntime::Impl {
                 request,
                 sample_call_index,
                 rng_offset_blocks,
-                sampling_policy,
                 semantic_scratch,
-                semantic_weights,
-                fallback_rng);
+                semantic_weights);
             if (token == prompt.audio_end_token_id) {
                 break;
             }
@@ -432,7 +409,6 @@ struct MiniMaxMusic3ArRuntime::Impl {
     MiniMaxMusic3GlobalLMWeights global_weights;
     std::unique_ptr<modules::QwenCausalDecodeRuntime> global_runtime;
     std::unique_ptr<MiniMaxMusic3DepthDecoderRuntime> depth;
-    sampling::TorchCudaSamplingPolicy sampling_policy;
     sampling::HfSamplerScratch semantic_scratch;
     std::vector<float> semantic_logits;
     std::vector<float> topk_window;

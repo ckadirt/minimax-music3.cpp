@@ -1,4 +1,5 @@
 #include "engine/community_models/minimax_music3/depth_decoder.h"
+#include "engine/community_models/minimax_music3/seed.h"
 
 #include "engine/framework/core/backend.h"
 #include "engine/framework/debug/profiler.h"
@@ -7,7 +8,6 @@
 #include "engine/framework/modules/structural_modules.h"
 #include "engine/framework/modules/weight_binding.h"
 #include "engine/framework/sampling/hf_sampler.h"
-#include "engine/framework/sampling/torch_random.h"
 
 #include <ggml.h>
 
@@ -16,7 +16,6 @@
 #include <chrono>
 #include <cmath>
 #include <memory>
-#include <random>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -183,29 +182,16 @@ int32_t sample_top_k(
     uint64_t seed,
     uint64_t & sample_call_index,
     uint64_t & rng_offset_blocks,
-    const engine::sampling::TorchCudaSamplingPolicy & policy,
     engine::sampling::HfSamplerScratch & scratch,
-    std::mt19937 & fallback_rng,
     const char * label) {
     sampling::HfLogitsProcessor::apply_top_k(logits, top_k, 1, scratch);
-    const sampling::HfTorchSamplingState torch_state{
-        &policy,
-        seed,
-        sample_call_index,
-        rng_offset_blocks,
-        true,
-    };
-    const int32_t token = sampling::HfTokenSampler::sample_from_processed_scores(
+    const int32_t token = static_cast<int32_t>(seeded_gumbel_argmax(
         logits,
-        scratch,
-        fallback_rng,
-        policy.cuda_fast_path ? &torch_state : nullptr,
-        label,
-        false);
+        derive_ar_sampling_seed(seed),
+        static_cast<std::uint32_t>(sample_call_index)));
     ++sample_call_index;
-    rng_offset_blocks += sampling::torch_cuda_tensor_iterator_offset_blocks(
-        static_cast<uint64_t>(logits.size()),
-        policy);
+    (void)rng_offset_blocks;
+    (void)label;
     return token;
 }
 
@@ -248,13 +234,7 @@ struct MiniMaxMusic3DepthDecoderRuntime::Impl {
           global_token_embedding(input_global_token_embedding),
           execution(input_execution),
           graph_arena_bytes(input_graph_arena_bytes),
-          weights(load_depth_weights(*assets, execution, weight_context_bytes, storage_type)),
-          sampling_policy(sampling::resolve_torch_cuda_sampling_policy(
-              execution.backend_type(),
-              execution.config().device,
-              "minimax_music3.depth.sampling",
-              "MiniMax Music 3 depth",
-              sampling::TorchCudaSamplingPolicyFailureMode::FallbackToDefault)) {
+          weights(load_depth_weights(*assets, execution, weight_context_bytes, storage_type)) {
         if (assets == nullptr) {
             throw std::runtime_error("MiniMax Music 3 depth runtime requires assets");
         }
@@ -419,8 +399,6 @@ struct MiniMaxMusic3DepthDecoderRuntime::Impl {
         std::vector<int32_t> out_codes{semantic_code};
         std::vector<float> out_hidden;
         out_hidden.reserve(static_cast<size_t>((config.codebooks - 1) * config.hidden_size));
-        std::mt19937 fallback_rng(static_cast<uint32_t>(seed));
-
         for (int64_t codebook = 1; codebook < config.codebooks; ++codebook) {
             auto & graph = decode_graph(codebook);
             const int32_t semantic_ids[2] = {
@@ -464,9 +442,7 @@ struct MiniMaxMusic3DepthDecoderRuntime::Impl {
                 seed,
                 sample_call_index,
                 rng_offset_blocks,
-                sampling_policy,
                 scratch,
-                fallback_rng,
                 "MiniMax Music 3 depth");
             out_codes.push_back(code);
         }
@@ -515,7 +491,6 @@ struct MiniMaxMusic3DepthDecoderRuntime::Impl {
     MiniMaxMusic3DepthWeights weights;
     std::array<DecodeGraph, 7> decode_graphs;
     FeedbackGraph feedback;
-    sampling::TorchCudaSamplingPolicy sampling_policy;
     sampling::HfSamplerScratch scratch;
     std::vector<float> last_hidden_scratch;
     std::vector<int32_t> active_residual_ids_scratch;

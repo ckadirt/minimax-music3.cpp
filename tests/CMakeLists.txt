@@ -23,6 +23,12 @@ add_executable(test-request test-request.cpp)
 target_link_libraries(test-request PRIVATE minimax::core)
 add_test(NAME request-contract COMMAND test-request)
 
+if(MINIMAX_BUILD_NATIVE_RUNTIME)
+    add_executable(test-seed test-seed.cpp)
+    target_link_libraries(test-seed PRIVATE minimax::native)
+    add_test(NAME seed-contract COMMAND test-seed)
+endif()
+
 find_package(Python3 COMPONENTS Interpreter)
 if(Python3_Interpreter_FOUND)
     add_test(NAME source-inventory
