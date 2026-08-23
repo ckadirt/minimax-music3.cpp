@@ -10,6 +10,29 @@ disabled for F32 correctness captures.
 Large checkpoints and raw oracle tensors are ignored. Compact metric summaries,
 fixture hashes, commands, and source revisions are committed.
 
+The dense component gate is executable, rather than a prose-only checklist:
+
+```bash
+# Install a CUDA-matched PyTorch >= 2.6 wheel first.
+python3 -m pip install -r parity/requirements-gpu.txt
+cmake -S . -B build-cuda -DCMAKE_BUILD_TYPE=Release \
+  -DGGML_CUDA=ON -DMINIMAX_DYNAMIC_BACKENDS=ON \
+  -DMINIMAX_BUILD_PARITY_TOOLS=ON
+cmake --build build-cuda --config Release -j
+python3 parity/run_dense.py \
+  --source models/MiniMax-Music3-source \
+  --gguf artifacts/gguf \
+  --binary build-cuda/bin/minimax-parity
+```
+
+`fixture-spec.json` freezes the random-input generator, shapes, revisions, and
+thresholds. The oracle loads one F32 Diffusers component at a time, disables
+TF32, and records hashes before unloading it. The native runner then executes
+the dense condition, two-branch DiT velocity, and planar stereo vocoder
+boundaries through the selected GGML backend. `compare.py` rejects shape,
+non-finite, maximum-error, or relative-RMS failures and emits a compact hashed
+summary. Raw `.f32` files remain under the ignored `artifacts/` tree.
+
 ## Initial numerical gates
 
 | Boundary | Gate |

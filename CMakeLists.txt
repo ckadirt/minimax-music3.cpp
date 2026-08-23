@@ -114,6 +114,16 @@ elseif(UNIX)
     set_target_properties(minimax-cli PROPERTIES INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
 endif()
 
+if(MINIMAX_BUILD_PARITY_TOOLS)
+    if(NOT MINIMAX_BUILD_NATIVE_RUNTIME)
+        message(FATAL_ERROR "MINIMAX_BUILD_PARITY_TOOLS requires MINIMAX_BUILD_NATIVE_RUNTIME")
+    endif()
+    add_executable(minimax-parity tools/minimax-parity.cpp)
+    target_link_libraries(minimax-parity PRIVATE minimax::native)
+    set_target_properties(minimax-parity PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+endif()
+
 install(TARGETS minimax-cli RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 if(MINIMAX_BUILD_NATIVE_RUNTIME)
     install(TARGETS cantor-engine

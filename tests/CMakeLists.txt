@@ -49,6 +49,9 @@ if(Python3_Interpreter_FOUND)
     add_test(NAME publication-policy
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/python/test_publication_policy.py
                 ${PROJECT_SOURCE_DIR})
+    add_test(NAME parity-policy
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/python/test_parity_policy.py
+                ${PROJECT_SOURCE_DIR})
 endif()
 
 # Runtime-loadable GGML backends are emitted beside the CLI. Making that the

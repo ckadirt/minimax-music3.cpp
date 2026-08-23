@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "seed": 20260823,
+  "source_revision": "fbdf52fbaaca799592917417eb05f1899f1255ec",
+  "diffusers_revision": "dafe3733fcfdbf3c48915fe77be3aef65b5d6a2d",
+  "dtype": "float32-le",
+  "components": {
+    "condition": {
+      "frames": 3,
+      "input_shape": [1, 3, 32768],
+      "output_shape": [1, 10, 2048],
+      "input_scale": 0.125,
+      "max_abs": 0.00005
+    },
+    "dit": {
+      "frames": 9,
+      "timestep": 0.375,
+      "latent_shape": [1, 128, 9],
+      "condition_shape": [1, 9, 2048],
+      "output_shape": [2, 128, 9],
+      "latent_scale": 0.25,
+      "condition_scale": 0.125,
+      "max_abs": 0.005,
+      "max_relative_rms": 0.003
+    },
+    "vocoder": {
+      "frames": 2,
+      "latent_shape": [1, 128, 2],
+      "output_shape": [1, 2, 1024],
+      "latent_scale": 0.25,
+      "max_abs": 0.003,
+      "max_relative_rms": 0.001
+    }
+  }
+}
