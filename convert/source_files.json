@@ -1,0 +1,31 @@
+{
+  "repository": "MiniMaxAI/MiniMax-Music3",
+  "revision": "fbdf52fbaaca799592917417eb05f1899f1255ec",
+  "files": [
+    {"path":"LICENSE","size":7373,"sha256":"b21d12df2adae59dad3fcf80c1d81492654c662342f497d9a9770198c9317e58"},
+    {"path":"README.md","size":11699,"sha256":"d24a3e65f3ab0b3b9852986fc2d63dffbdfb8b0472d502dd3de47a24d41c623a"},
+    {"path":"config.json","size":107,"sha256":"1ffcff67d916d5519d1ef9a36853232ee6bcb7e14a936623c4e85559f5dce106"},
+    {"path":"modular_model_index.json","size":2391,"sha256":"1dc86609cf8855e70cc3f5d085213988094fb59e448aedcda06740d34e386002"},
+    {"path":"condition_encoder/config.json","size":292,"sha256":"1cdea3f36506719128ae4a29cdfff74b1134e607eb4a504ce6d810568fac8263"},
+    {"path":"condition_encoder/diffusion_pytorch_model.safetensors","size":100671852,"sha256":"83179c5eaa9a68a370affe0c1b96c2179f659ea4175666b31071490a202c2a4d"},
+    {"path":"language_model/config.json","size":1596,"sha256":"34ded58fcd5e8181557f1417e76af9f3e95109a5ce113a4771fd16f8625b53c0"},
+    {"path":"language_model/generation_config.json","size":158,"sha256":"c0f7c1612e174a7bdec9548464a7bf031a0292587033228e6767fb9e5dc367cd"},
+    {"path":"language_model/model-00001-of-00004.safetensors","size":4910103856,"sha256":"1e95924a158b45b67cfad04fa0f0a352e5a263e69338734d7c1d558be776cc98"},
+    {"path":"language_model/model-00002-of-00004.safetensors","size":4915960352,"sha256":"fde2d335eef7eafa268d35e53d4b040ee51d2f3fa727f9855b4c97d88a2892da"},
+    {"path":"language_model/model-00003-of-00004.safetensors","size":4983068496,"sha256":"6549a831637ab678a573047e7fa8fdf966998c4f45330e6eb7573d67f7b9b4c6"},
+    {"path":"language_model/model-00004-of-00004.safetensors","size":2359864688,"sha256":"a1c9865f357b64d3ae9f428fb98a844831e5a0aee9ed17b19bd7f7be32b964a9"},
+    {"path":"language_model/model.safetensors.index.json","size":32914,"sha256":"a8bf9de1e8c0d680f39730a127d74445b4abf505623bd91d5ed4f97c0869cc2a"},
+    {"path":"rvq_depth_decoder/config.json","size":274,"sha256":"b38c7f72d4b2fa8667442071f9e4a63ca5a7b5d0859e5e64ee7f79c4bc64520c"},
+    {"path":"rvq_depth_decoder/diffusion_pytorch_model.safetensors","size":1292055248,"sha256":"80e86ab006bb5c8d4f223205045035a1c77b2bb9c3be9a86d7e740bbafe5ddf0"},
+    {"path":"scheduler/scheduler_config.json","size":483,"sha256":"b544466124aab333da4874417da0168610067e9c9ff95fcb63d749e4bf891d99"},
+    {"path":"tokenizer/chat_template.jinja","size":4168,"sha256":"a55ee1b1660128b7098723e0abcd92caa0788061051c62d51cbe87d9cf1974d8"},
+    {"path":"tokenizer/tokenizer.json","size":11423801,"sha256":"b1537fa9e59a537276ecbc2e12d0438edff635a1f4a4948e679774b5feb3e610"},
+    {"path":"tokenizer/tokenizer_config.json","size":377,"sha256":"1689852cc9c45010de040c8302a8acdc0d2c4c6c740dd7e9dd0a8c704e16eada"},
+    {"path":"transformer/config.json","size":294,"sha256":"f60856be934127a8b8223510aff2e38a9efd8bbdbc230c3d3339b96e2cb12f00"},
+    {"path":"transformer/diffusion_pytorch_model-00001-of-00002.safetensors","size":4959921384,"sha256":"1943baebe93b5d5a57e9e1f603d9cef51a73a55e7a42f52913932dc06dcf10f0"},
+    {"path":"transformer/diffusion_pytorch_model-00002-of-00002.safetensors","size":4767750800,"sha256":"b2f9e29d241e107e5a281f8b369d6db48eee983917df966c56d7b8dd0bd482c2"},
+    {"path":"transformer/diffusion_pytorch_model.safetensors.index.json","size":42679,"sha256":"5a57fc3b98e91ec7f4e9da199b3dc8ce1c67e42824c42bed91c15443c049b991"},
+    {"path":"vocoder/config.json","size":251,"sha256":"4161afd07ba7d5b949e29c8a7a005592259fba73e9110b6ece9dfd38d3489eac"},
+    {"path":"vocoder/diffusion_pytorch_model.safetensors","size":216695272,"sha256":"daf0bf0560ea978ce7b5ec3e82f420a44429efef18bdfbe3c714d55ceffbe934"}
+  ]
+}

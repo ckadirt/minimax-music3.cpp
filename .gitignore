@@ -27,6 +27,8 @@ staging/
 *.npy
 *.npz
 *.resume
+*.part
+source-manifest.json
 
 # Generated manifests are staged with model artifacts, not source.
 *.gguf.manifest.json

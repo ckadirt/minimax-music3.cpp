@@ -15,7 +15,9 @@ namespace {
 const char * kind_name(minimax::backend_kind kind) {
     switch (kind) {
         case minimax::backend_kind::cuda: return "cuda";
-        case minimax::backend_kind::gpu: return "gpu";
+        case minimax::backend_kind::hip: return "hip";
+        case minimax::backend_kind::vulkan: return "vulkan";
+        case minimax::backend_kind::metal: return "metal";
         case minimax::backend_kind::cpu: return "cpu";
         case minimax::backend_kind::auto_select: return "auto";
     }
@@ -26,7 +28,9 @@ minimax::backend_kind parse_kind(const std::string & value) {
     if (value == "auto") return minimax::backend_kind::auto_select;
     if (value == "cpu") return minimax::backend_kind::cpu;
     if (value == "cuda") return minimax::backend_kind::cuda;
-    if (value == "gpu" || value == "vulkan" || value == "metal") return minimax::backend_kind::gpu;
+    if (value == "hip" || value == "rocm") return minimax::backend_kind::hip;
+    if (value == "vulkan") return minimax::backend_kind::vulkan;
+    if (value == "metal") return minimax::backend_kind::metal;
     throw std::invalid_argument("unknown backend kind: " + value);
 }
 
@@ -34,8 +38,11 @@ void usage(const char * program) {
     std::cerr << "minimax-music3.cpp " << minimax::version() << "\n\n"
               << "Usage:\n"
               << "  " << program << " --list-backends\n"
-              << "  " << program << " --smoke [auto|cpu|cuda|gpu] [device-index]\n"
-              << "  " << program << " --validate-request REQUEST.json\n";
+              << "  " << program << " --smoke [auto|cpu|cuda|hip|vulkan|metal] [device-index]\n"
+              << "  " << program << " --validate-request REQUEST.json\n"
+              << "  " << program << " --generate REQUEST.json --model DIR --output FILE.wav"
+                 " [--backend KIND] [--device N] [--threads N] [--lm FILE] [--rvq FILE]"
+                 " [--condition FILE] [--dit FILE] [--vae FILE]\n";
 }
 
 std::string read_file(const std::string & path) {
@@ -76,6 +83,28 @@ int main(int argc, char ** argv) {
         if (command == "--validate-request" && argc == 3) {
             const auto request = minimax::request_io::parse(read_file(argv[2]));
             std::cout << minimax::request_io::serialize(request) << '\n';
+            return 0;
+        }
+        if (command == "--generate" && argc >= 7) {
+            const auto request = minimax::request_io::parse(read_file(argv[2]));
+            minimax::generation_options options;
+            for (int index = 3; index < argc; index += 2) {
+                if (index + 1 >= argc) throw std::invalid_argument("missing value for " + std::string(argv[index]));
+                const std::string option = argv[index];
+                const std::string value = argv[index + 1];
+                if (option == "--model") options.model_directory = value;
+                else if (option == "--output") options.output_wav = value;
+                else if (option == "--backend") options.backend = parse_kind(value);
+                else if (option == "--device") options.device_index = std::stoi(value);
+                else if (option == "--threads") options.threads = std::stoi(value);
+                else if (option == "--lm") options.lm_gguf = value;
+                else if (option == "--rvq") options.rvq_gguf = value;
+                else if (option == "--condition") options.condition_gguf = value;
+                else if (option == "--dit") options.dit_gguf = value;
+                else if (option == "--vae") options.vae_gguf = value;
+                else throw std::invalid_argument("unknown generation option: " + option);
+            }
+            minimax::generate_wav(request, options);
             return 0;
         }
         usage(argv[0]);

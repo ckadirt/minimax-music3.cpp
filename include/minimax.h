@@ -12,7 +12,9 @@ enum class backend_kind {
     auto_select,
     cpu,
     cuda,
-    gpu,
+    hip,
+    vulkan,
+    metal,
 };
 
 struct backend_info {
@@ -37,6 +39,19 @@ struct generation_request {
     int output_sample_rate = 44100;
 };
 
+struct generation_options {
+    std::string model_directory;
+    std::string output_wav;
+    backend_kind backend = backend_kind::auto_select;
+    int device_index = 0;
+    int threads = 1;
+    std::string lm_gguf;
+    std::string rvq_gguf;
+    std::string condition_gguf;
+    std::string dit_gguf;
+    std::string vae_gguf;
+};
+
 class operation_cancelled : public std::runtime_error {
 public:
     operation_cancelled() : std::runtime_error("MiniMax Music 3 operation cancelled") {}
@@ -46,5 +61,6 @@ const char * version() noexcept;
 std::vector<backend_info> available_backends();
 std::vector<float> backend_smoke(backend_kind kind = backend_kind::auto_select,
                                  int device_index = 0);
+void generate_wav(const generation_request & request, const generation_options & options);
 
 } // namespace minimax

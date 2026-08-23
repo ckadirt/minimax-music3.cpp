@@ -12,6 +12,8 @@ The native model implementation is adapted from
 [`0xShug0/audio.cpp`](https://github.com/0xShug0/audio.cpp) at revision
 `62735eafd96294c52d6c4607f5f38ac55be54f06`, Copyright 2026 ShugoAI LLC,
 under Apache-2.0. Adapted files must retain a modification notice.
+The compiled, pruned source snapshot and its portability modifications are
+documented in `third_party/audiocpp/README.md`; its license is retained there.
 
 ## Hugging Face Diffusers and SGLang-Omni
 

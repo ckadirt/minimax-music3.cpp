@@ -67,3 +67,29 @@ inventory before importing weight-owning model graphs.
 
 Next: freeze the component checkpoint inventory, deterministic source manifest,
 and streaming GGUF conversion contract.
+
+## 2026-08-23 — checkpoint pipeline and native graphs
+
+- Froze all 25 componentized inference files (28,517,620,805 bytes) at the
+  approved checkpoint commit, including exact SHA-256 values. Added a
+  resumable stdlib-only downloader and verified the 16-file metadata subset on
+  this CPU machine.
+- Imported the audited MiniMax-only audio.cpp framework subset. It builds
+  against the pinned GGML after lowering three post-pin/custom paths through
+  portable public operations; unrelated models and SentencePiece are absent.
+- Compiled the global Qwen3 LM, RVQ depth decoder, condition projection, 36
+  layer flow transformer/Euler sampler, and stereo vocoder into
+  `minimax-native`. Added a strict config fingerprint before weight loading.
+- Added a converter and the 18-artifact matrix: BF16 LM/RVQ; F32 condition;
+  F32 DiT; F32/F16 VAE; and Q8_0, Q6_K, Q5_K_M, and Q4_K_M for LM/RVQ/DiT.
+  Mixed profiles promote lookup/output/down projections to Q6_K and keep
+  convolution/time tensors F32. Every output receives deterministic manifest
+  and checksum sidecars, and existing artifacts are never overwritten.
+- Added `minimax-cli --generate` with explicit CPU/CUDA/HIP/Vulkan/Metal
+  selection and all five component selectors. Native 44.1 kHz stereo and
+  explicit 32 kHz output are wired.
+- Built the full CPU runtime and converter, ran seven tests, and confirmed the
+  GGML compute smoke returns `5 5 5 5`.
+
+Next: finish official RNG/seed parity and implement the versioned Cantor ABI v1
+stage boundaries before real-model GPU validation.

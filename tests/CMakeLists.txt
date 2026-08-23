@@ -22,3 +22,13 @@ add_test(NAME tokenizer-contract COMMAND test-tokenizer)
 add_executable(test-request test-request.cpp)
 target_link_libraries(test-request PRIVATE minimax::core)
 add_test(NAME request-contract COMMAND test-request)
+
+find_package(Python3 COMPONENTS Interpreter)
+if(Python3_Interpreter_FOUND)
+    add_test(NAME source-inventory
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/python/test_source_inventory.py
+                ${PROJECT_SOURCE_DIR})
+    add_test(NAME conversion-policy
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/python/test_conversion_policy.py
+                ${PROJECT_SOURCE_DIR})
+endif()

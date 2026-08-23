@@ -41,12 +41,23 @@ bool gpu_device(ggml_backend_dev_t device) {
 }
 
 bool cuda_device(ggml_backend_dev_t device) {
-    return gpu_device(device) && std::string(ggml_backend_dev_name(device)).rfind("CUDA", 0) == 0;
+    if (!gpu_device(device)) return false;
+    auto * reg = ggml_backend_dev_backend_reg(device);
+    const std::string name = reg == nullptr ? "" : ggml_backend_reg_name(reg);
+    return name == "CUDA" || name == "MUSA";
+}
+
+std::string registry_name(ggml_backend_dev_t device) {
+    auto * reg = ggml_backend_dev_backend_reg(device);
+    return reg == nullptr ? "" : ggml_backend_reg_name(reg);
 }
 
 backend_kind classify(ggml_backend_dev_t device) {
     if (cuda_device(device)) return backend_kind::cuda;
-    if (gpu_device(device)) return backend_kind::gpu;
+    const auto name = registry_name(device);
+    if (name == "ROCm") return backend_kind::hip;
+    if (name == "Vulkan") return backend_kind::vulkan;
+    if (name == "MTL") return backend_kind::metal;
     return backend_kind::cpu;
 }
 
@@ -69,8 +80,12 @@ ggml_backend_dev_t select_device(backend_kind requested, int device_index) {
             })) return device;
     } else if (requested == backend_kind::cuda) {
         if (auto * device = find_nth(cuda_device)) return device;
-    } else if (requested == backend_kind::gpu) {
-        if (auto * device = find_nth(gpu_device)) return device;
+    } else if (requested == backend_kind::hip) {
+        if (auto * device = find_nth([](ggml_backend_dev_t value) { return registry_name(value) == "ROCm"; })) return device;
+    } else if (requested == backend_kind::vulkan) {
+        if (auto * device = find_nth([](ggml_backend_dev_t value) { return registry_name(value) == "Vulkan"; })) return device;
+    } else if (requested == backend_kind::metal) {
+        if (auto * device = find_nth([](ggml_backend_dev_t value) { return registry_name(value) == "MTL"; })) return device;
     } else if (auto * device = find_nth([](ggml_backend_dev_t value) {
             return ggml_backend_dev_type(value) == GGML_BACKEND_DEVICE_TYPE_CPU;
         })) return device;

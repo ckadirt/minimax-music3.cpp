@@ -3,6 +3,7 @@ Copyright 2026 the minimax-music3.cpp contributors
 
 This product includes software developed by ShugoAI LLC for audio.cpp,
 Copyright 2026 ShugoAI LLC, licensed under the Apache License 2.0.
+The audited source subset is recorded in third_party/audiocpp/README.md.
 
 This product uses GGML and tokenizer/Unicode components under their respective
 licenses. See THIRD_PARTY_NOTICES.md.

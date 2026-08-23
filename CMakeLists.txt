@@ -13,6 +13,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 option(MINIMAX_BUILD_TESTS "Build weightless unit tests" ON)
 option(MINIMAX_BUILD_PARITY_TOOLS "Build real-model parity tools" OFF)
 option(MINIMAX_DYNAMIC_BACKENDS "Build GGML backends as runtime-loadable libraries" OFF)
+option(MINIMAX_BUILD_NATIVE_RUNTIME "Build the audited MiniMax model graphs and converter" ON)
 
 set(GGML_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(GGML_BUILD_TESTS OFF CACHE BOOL "" FORCE)
@@ -53,6 +54,15 @@ target_include_directories(minimax-core
 target_link_libraries(minimax-core PUBLIC ggml::ggml Threads::Threads)
 target_compile_definitions(minimax-core PUBLIC MINIMAX_VERSION="${PROJECT_VERSION}")
 target_compile_features(minimax-core PUBLIC cxx_std_17)
+
+if(MINIMAX_BUILD_NATIVE_RUNTIME)
+    add_subdirectory(third_party/audiocpp)
+    target_sources(minimax-core PRIVATE src/minimax-native.cpp)
+    target_link_libraries(minimax-core PUBLIC minimax::native)
+    target_compile_definitions(minimax-core PUBLIC MINIMAX_HAS_NATIVE_RUNTIME=1)
+else()
+    target_sources(minimax-core PRIVATE src/minimax-native-stub.cpp)
+endif()
 
 if(MSVC)
     target_compile_options(minimax-core PRIVATE /W4 /utf-8)

@@ -9,13 +9,41 @@ numerical parity with pinned official Python implementations, strict GGUF
 conversion, Cantor ABI v1 pause/resume support, and real-backend validation.
 Do not treat an untagged build or unpublished checkpoint as release quality.
 
-## Planned runtime contract
+## Runtime contract
 
 - Lyrics and a music description produce up to five minutes of stereo audio.
-- Native output is 44.1 kHz; explicit 32 kHz serving compatibility is planned.
+- Native output is 44.1 kHz; explicit 32 kHz serving compatibility uses a
+  Torchaudio-compatible sinc/Hann resampler.
 - Model components are supplied through the Cantor roles `lm`, `rvq`,
   `condition`, `dit`, and `vae`.
 - CPU, CUDA, Vulkan, Metal, and Android builds share the same model code.
+
+## Build and conversion
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j
+ctest --test-dir build --output-on-failure
+
+python3 convert/download_model.py --output models/MiniMax-Music3-source
+python3 convert/convert_model.py \
+  --source models/MiniMax-Music3-source \
+  --output artifacts/MiniMax-Music3-GGUF \
+  --converter build/bin/minimax-gguf-convert
+```
+
+The downloader accepts `HF_TOKEN` from the environment, resumes `.part`
+files, and verifies every byte against the pinned 25-file inventory. The full
+conversion produces 18 artifacts across the five component roles. Existing
+GGUFs are never overwritten.
+
+Generation uses the Q4_K_M/F16 default component mix, or explicit role files:
+
+```bash
+build/bin/minimax-cli --generate request.json \
+  --model artifacts/MiniMax-Music3-GGUF \
+  --output song.wav --backend cuda --device 0
+```
 
 The pinned sources and implementation order are recorded in
 [`docs/plan.md`](docs/plan.md). Ongoing work and reproducible commands are
