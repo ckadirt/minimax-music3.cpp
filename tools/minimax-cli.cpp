@@ -1,8 +1,10 @@
 #include "minimax.h"
+#include "minimax-request.h"
 
 #include <cmath>
 #include <cstdlib>
 #include <exception>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <stdexcept>
@@ -32,7 +34,14 @@ void usage(const char * program) {
     std::cerr << "minimax-music3.cpp " << minimax::version() << "\n\n"
               << "Usage:\n"
               << "  " << program << " --list-backends\n"
-              << "  " << program << " --smoke [auto|cpu|cuda|gpu] [device-index]\n";
+              << "  " << program << " --smoke [auto|cpu|cuda|gpu] [device-index]\n"
+              << "  " << program << " --validate-request REQUEST.json\n";
+}
+
+std::string read_file(const std::string & path) {
+    std::ifstream input(path, std::ios::binary);
+    if (!input) throw std::runtime_error("cannot open request: " + path);
+    return {std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
 }
 
 } // namespace
@@ -62,6 +71,11 @@ int main(int argc, char ** argv) {
                 std::cout << std::setprecision(8) << result[index];
             }
             std::cout << '\n';
+            return 0;
+        }
+        if (command == "--validate-request" && argc == 3) {
+            const auto request = minimax::request_io::parse(read_file(argv[2]));
+            std::cout << minimax::request_io::serialize(request) << '\n';
             return 0;
         }
         usage(argv[0]);

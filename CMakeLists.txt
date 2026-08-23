@@ -33,6 +33,7 @@ add_library(minimax-core STATIC
     src/minimax.cpp
     src/minimax-chunking.cpp
     src/minimax-prompt.cpp
+    src/minimax-request.cpp
     src/minimax-tokenizer.cpp
     third_party/llama-unicode/unicode.cpp
     third_party/llama-unicode/unicode-data.cpp

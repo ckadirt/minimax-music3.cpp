@@ -45,3 +45,27 @@ The runtime owns five independently selectable components: `lm`, `rvq`,
 
 Every boundary is versioned, little-endian, length-delimited, checksummed, and
 stamped with the exact component SHA-256 values and canonical request.
+
+## Cantor request v1
+
+The JSON request is a closed schema. Unknown keys, duplicate keys, invalid
+UTF-8, lossy integer spellings, and non-finite numbers are rejected. Lyrics,
+description, and `duration_seconds` are required; all other values use the
+defaults shown here. The optional flow seed remains absent until the runtime
+applies the pinned upstream seed derivation.
+
+```json
+{
+  "lyrics": "[Verse]\n...",
+  "description": "warm synth-pop, female vocal",
+  "duration_seconds": 20,
+  "seed": 0,
+  "cfg_scale": 1.5,
+  "sampling": { "top_k": 50 },
+  "flow": { "seed": 0, "euler_steps": 30, "cfg_scale": 1.7 },
+  "output_sample_rate": 44100
+}
+```
+
+Duration is limited to 300 seconds. The supported output rates are the native
+44,100 Hz and the Cantor serving rate of 32,000 Hz.

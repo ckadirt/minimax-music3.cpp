@@ -18,3 +18,7 @@ target_include_directories(test-tokenizer PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_compile_definitions(test-tokenizer PRIVATE
     MINIMAX_TEST_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
 add_test(NAME tokenizer-contract COMMAND test-tokenizer)
+
+add_executable(test-request test-request.cpp)
+target_link_libraries(test-request PRIVATE minimax::core)
+add_test(NAME request-contract COMMAND test-request)

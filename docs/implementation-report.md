@@ -52,3 +52,18 @@ Next: add the pinned GGML/build scaffold and weightless contract tests.
 
 Next: add strict request/config parsing and the component GGUF conversion
 inventory before importing weight-owning model graphs.
+
+## 2026-08-23 — strict Cantor request contract
+
+- Added the closed Cantor v1 JSON schema and canonical serializer. The parser
+  rejects unknown/duplicate keys, aliases, malformed Unicode, non-exact
+  unsigned integers, unsupported output rates, and out-of-range generation
+  settings.
+- Preserved an absent flow seed so the runtime, rather than the parser, can
+  apply the pinned SGLang seed derivation.
+- Added `minimax-cli --validate-request REQUEST.json` for deployment-side
+  validation and canonicalization.
+- Rebuilt the CPU target and ran all five weightless tests successfully.
+
+Next: freeze the component checkpoint inventory, deterministic source manifest,
+and streaming GGUF conversion contract.
