@@ -51,7 +51,6 @@ Native output is stereo 44.1 kHz; Cantor requests may explicitly select the
 Torchaudio-compatible 32 kHz serving resampler. The same model implementation
 targets CPU, CUDA, HIP, Vulkan, Metal, and Android through GGML.
 
-This initial publication remains staging-only until the repository's committed
-real-model parity matrix passes on the reference Python implementation and the
-declared hardware backends.
-
+Publication tooling refuses a network upload until the repository's committed
+real-model parity matrix passes against the reference Python implementation
+and the declared hardware backends.

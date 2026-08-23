@@ -1,9 +1,51 @@
 set(AUDIOCPP_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
 
-file(GLOB_RECURSE AUDIOCPP_FRAMEWORK_SOURCES CONFIGURE_DEPENDS
-    "${AUDIOCPP_ROOT}/src/framework/*.cpp")
-list(FILTER AUDIOCPP_FRAMEWORK_SOURCES EXCLUDE REGEX
-    "/src/framework/(package_manager/|runtime/registry\\.cpp$|tokenizers/sentencepiece\\.cpp$|modules/vocoders/bigvgan_vocoder\\.cpp$|modules/attention/(common_relative_attention|relative_attention)\\.cpp$)")
+# Framework translation units reachable from the MiniMax session, Cantor ABI,
+# CLI, and converter. Unrelated ASR, enhancement, pitch, and codec modules from
+# upstream audio.cpp deliberately do not enter this standalone port.
+set(AUDIOCPP_FRAMEWORK_SOURCES
+    src/framework/assets/resource_bundle.cpp
+    src/framework/assets/tensor_source.cpp
+    src/framework/assets/weight_norm_folding.cpp
+    src/framework/audio/resampling.cpp
+    src/framework/audio/wav_writer.cpp
+    src/framework/core/backend.cpp
+    src/framework/core/execution_context.cpp
+    src/framework/core/module.cpp
+    src/framework/debug/profiler.cpp
+    src/framework/debug/trace.cpp
+    src/framework/io/binary.cpp
+    src/framework/io/filesystem.cpp
+    src/framework/io/json.cpp
+    src/framework/io/safetensors.cpp
+    src/framework/io/yaml.cpp
+    src/framework/model_spec/options.cpp
+    src/framework/model_spec/package.cpp
+    src/framework/model_spec/schema.cpp
+    src/framework/modules/activation_modules.cpp
+    src/framework/modules/attention/scaled_dot_product_attention.cpp
+    src/framework/modules/conv_modules.cpp
+    src/framework/modules/flow_sampler_runtime.cpp
+    src/framework/modules/linear_module.cpp
+    src/framework/modules/lookup_modules.cpp
+    src/framework/modules/norm_modules.cpp
+    src/framework/modules/optimizations/fast_kv_modules.cpp
+    src/framework/modules/positional_modules.cpp
+    src/framework/modules/primitive_modules.cpp
+    src/framework/modules/structural_modules.cpp
+    src/framework/modules/transformers/qwen_causal_decode_runtime.cpp
+    src/framework/modules/transformers/qwen_causal_decoder.cpp
+    src/framework/modules/transformers/qwen_decoder.cpp
+    src/framework/runtime/graph_executor.cpp
+    src/framework/runtime/kv_cache.cpp
+    src/framework/runtime/model.cpp
+    src/framework/runtime/options.cpp
+    src/framework/runtime/session.cpp
+    src/framework/runtime/session_base.cpp
+    src/framework/sampling/hf_sampler.cpp
+    src/framework/sampling/torch_random.cpp
+    src/framework/tokenizers/llama_bpe.cpp)
+list(TRANSFORM AUDIOCPP_FRAMEWORK_SOURCES PREPEND "${AUDIOCPP_ROOT}/")
 file(GLOB AUDIOCPP_MINIMAX_SOURCES CONFIGURE_DEPENDS
     "${AUDIOCPP_ROOT}/src/community_models/minimax_music3/*.cpp")
 file(GLOB AUDIOCPP_LLAMA_TOKENIZER_SOURCES CONFIGURE_DEPENDS

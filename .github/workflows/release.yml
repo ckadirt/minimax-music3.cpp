@@ -298,7 +298,11 @@ jobs:
             -DGGML_NATIVE=OFF
             -DGGML_OPENMP=OFF
           )
-          if [[ '${{ matrix.backend }}' == vulkan ]]; then args+=(-DGGML_VULKAN=ON); fi
+          if [[ '${{ matrix.backend }}' == vulkan ]]; then
+            spirv_config="$(find "$VULKAN_SDK" -type f \( -name 'SPIRV-HeadersConfig.cmake' -o -name 'spirv-headers-config.cmake' \) -print -quit)"
+            test -n "$spirv_config"
+            args+=(-DGGML_VULKAN=ON "-DSPIRV-Headers_DIR=$(dirname "$spirv_config")")
+          fi
           cmake "${args[@]}"
           cmake --build build --parallel "$(nproc)"
       - name: Package

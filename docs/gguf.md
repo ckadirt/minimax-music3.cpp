@@ -33,5 +33,5 @@ retaining the logical tensor shape in metadata. Runtime loaders reject an
 artifact whose padding or tensor routing differs from its declared profile.
 
 Every artifact has deterministic `.manifest.json` and `.sha256` sidecars.
-Quantized manifests also record the exact baseline GGUF SHA-256 from which they
-were derived.
+Quantized manifests also record every tensor-type override, the exact source
+inventory hash, and the pinned GGML/converter revisions used to derive them.
