@@ -1,0 +1,16 @@
+{
+  "lyrics": "[Verse]\nSing a bright morning melody\nLet the rhythm carry on",
+  "description": "warm acoustic pop, clear lead vocal, steady drums",
+  "duration_seconds": 2,
+  "seed": 7,
+  "cfg_scale": 1.5,
+  "sampling": {
+    "top_k": 50
+  },
+  "flow": {
+    "seed": 11,
+    "euler_steps": 4,
+    "cfg_scale": 1.7
+  },
+  "output_sample_rate": 44100
+}

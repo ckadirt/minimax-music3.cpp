@@ -30,6 +30,13 @@ build-cuda/bin/minimax-cantor-smoke \
   --model artifacts/gguf \
   --request artifacts/cantor-smoke-request.json \
   --threads 4
+
+python3 parity/run_quantized.py \
+  --binary build-cuda/bin/minimax-cli \
+  --model artifacts/gguf \
+  --request parity/requests/quantized-smoke.json \
+  --output-dir artifacts/parity/quantized-cuda \
+  --backend cuda --threads 4
 ```
 
 `fixture-spec.json` freezes the random-input generator, shapes, revisions, and
@@ -47,6 +54,10 @@ record suitable for release evidence.
 The DiT component runner also executes every fixture twice and requires an
 exact match before comparing with Python. This guards the GGML graph against
 destructive reuse and stale backend graph-cache state.
+`run_quantized.py` executes six mixed-component cases covering every one of the
+18 release GGUFs, validates stereo PCM16 sample rate and non-silence, and emits
+a hashed JSON summary. Individual matrix names can be selected with
+`--profiles`; the full CUDA run is required for the quantized-profile gate.
 
 ## Initial numerical gates
 
