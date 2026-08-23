@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "status": "pending",
+  "device": "NVIDIA H100 80GB HBM3",
+  "source_commit": "4d63da8f8173e48f34f3b6d208c9d8b815dcedad",
+  "ggml": "2f50f0164352c6aa301da49a4e344c2379c82afd",
+  "sdk": "LunarG Vulkan SDK 1.4.309.0",
+  "build": {
+    "status": "pass",
+    "dynamic_backends": true,
+    "vulkan_enabled": true,
+    "tests_passed": 12,
+    "tests_failed": 0,
+    "cli_sha256": "93d518def42b097cb9b228cc12bf03482ffcea29335a858ccbb282fb5cb8e800",
+    "plugin_sha256": "a7bbd524932509b34c68b4bbad615586fdd2e13a43095febdce682e2e50b0117"
+  },
+  "runtime": {
+    "status": "unavailable",
+    "host_icd": "/etc/vulkan/icd.d/nvidia_icd.json",
+    "host_icd_api_version": "1.4.312",
+    "backend_discovery": ["cpu"],
+    "explicit_smoke_exit_code": 1,
+    "explicit_smoke_error": "requested GGML backend device is unavailable",
+    "vulkaninfo_exit_code": 1,
+    "vulkaninfo_error": "vkCreateInstance failed with ERROR_INCOMPATIBLE_DRIVER: loader found no usable drivers"
+  },
+  "gate_reason": "The portable Vulkan code, shaders, and plugin build and test successfully, but this host does not expose a usable Vulkan device. A real-model run on Vulkan-capable hardware is still required."
+}

@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "status": "pass",
+  "device": "NVIDIA H100 80GB HBM3",
+  "ggml": "2f50f0164352c6aa301da49a4e344c2379c82afd",
+  "cli": {
+    "profile": "Q4_K_M",
+    "rate_44100": {
+      "sha256": "cd59d414cd9c717e4950dd671d4595df82f2967b23730f30bdbee3379b360ddb",
+      "repeat_sha256": "cd59d414cd9c717e4950dd671d4595df82f2967b23730f30bdbee3379b360ddb",
+      "frames": 1536,
+      "peak_i16": 425,
+      "rms_i16": 136.915909031
+    },
+    "rate_32000": {
+      "sha256": "3841ed99a1cad624d66964aa586263484c8752fbda9badcb941af378942c19de",
+      "frames": 1115,
+      "peak_i16": 417,
+      "rms_i16": 136.829800009
+    }
+  },
+  "cantor": {
+    "codes_equal": true,
+    "diffuse_equal": true,
+    "decode_equal": true,
+    "sample_rate": 44100,
+    "samples_per_channel": 3072,
+    "peak_f32": 0.0287822,
+    "rms_f32": 0.00398087,
+    "codes_bytes": 8793,
+    "diffuse_bytes": 12201,
+    "audio_fnv1a64": 4549339077756924446
+  }
+}

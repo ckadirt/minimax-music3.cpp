@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "status": "pass",
+  "backend": "cuda",
+  "device": "NVIDIA H100 80GB HBM3",
+  "request_sha256": "d8c2d4c70c9464262bca66b87846d9e19adb75c0a42676fe96259777936a277f",
+  "raw_summary_sha256": "9dfbfcc6b077819d92f7a33996d2c514d5bfe640406d28ee60a96c3be54078ee",
+  "profiles": [
+    {"name": "BF16-F32-F32VAE", "frames": 88064, "peak_i16": 6523, "rms_i16": 782.5196792065497, "sha256": "59d37419a55d200ee9bb6037c47a04ae0491e0dfacba17861c6b017b20e2eca5"},
+    {"name": "BF16-F32-F16VAE", "frames": 88064, "peak_i16": 6521, "rms_i16": 782.2436296179422, "sha256": "792153edc27689fe72b77340f2a134d419083ef425cfdfc0a5984da72883639a"},
+    {"name": "Q8_0", "frames": 88064, "peak_i16": 1868, "rms_i16": 215.2108021637382, "sha256": "4fbdb8bfc59bab46a407b09a3d2e5431977486ee1603f359a761146a112a08f7"},
+    {"name": "Q6_K", "frames": 88064, "peak_i16": 1825, "rms_i16": 145.69698565530626, "sha256": "4000772a9e556e1c3712ae364c2f9fa8488429d9c64505c1311a34506bcedfa2"},
+    {"name": "Q5_K_M", "frames": 88064, "peak_i16": 6674, "rms_i16": 450.3903683010221, "sha256": "34814154d51aad540a02bee57088beaff678f087db89928eba913047b9893c51"},
+    {"name": "Q4_K_M", "frames": 88064, "peak_i16": 5533, "rms_i16": 787.4774070196305, "sha256": "cf0bfe85d150f99986c7e46591aeb58b81b242c3a8b4b16373ffe76aaee782c2"}
+  ]
+}

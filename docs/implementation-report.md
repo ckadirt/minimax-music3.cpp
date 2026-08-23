@@ -243,3 +243,43 @@ workspace storage for the existing source/GGUF artifacts plus parity fixtures.
 
 Next: rebuild the CUDA CLI/Cantor harness, run exact resume and rate smokes,
 then execute all six mixed-component quantized profiles covering 18 GGUFs.
+
+## 2026-08-23 — real CUDA runtime and quantized matrix green
+
+- The H100 Q4 CLI produced byte-identical 44.1 kHz stereo on two runs with
+  SHA-256 `cd59d414cd9c717e4950dd671d4595df82f2967b23730f30bdbee3379b360ddb`
+  (1,536 frames, peak PCM16 425, RMS 136.915909031). The 32 kHz path produced
+  1,115 finite non-silent stereo frames with SHA-256
+  `3841ed99a1cad624d66964aa586263484c8752fbda9badcb941af378942c19de`.
+- The CUDA Cantor harness preserved exact CODES, DIFFUSE, and DECODE results
+  across interruption/resumption. It returned 3,072 samples per channel at
+  44.1 kHz with FNV-1a-64 `4549339077756924446`.
+- `parity/run_quantized.py` passed all six mixed-component cases: two BF16/F32
+  baselines plus Q8_0, Q6_K, Q5_K_M, and Q4_K_M. Together they loaded every
+  one of the 18 staged GGUFs and produced finite, non-silent 88,064-frame
+  stereo PCM16 output.
+- Compact release evidence is in `validation/evidence/h100-cuda-runtime.json`
+  and `validation/evidence/h100-quantized.json`. The dense, quantized-profile,
+  Cantor-resume, CPU, and CUDA gates are now passing. Publication remains
+  blocked on real Vulkan, Metal, and Android model runs.
+
+Next: probe this H100 host for a usable Vulkan ICD. If none is exposed, retain
+the Vulkan gate as pending and proceed to portable CI for the CUDA changes.
+
+## 2026-08-23 — Vulkan build green, host runtime unavailable
+
+- The pinned LunarG Vulkan SDK 1.4.309.0 configured and built the complete
+  release tree, including generated shaders, the dynamic `libggml-vulkan.so`
+  plugin, the CLI, the Cantor backend, parity runners, and all test targets.
+- All 12 tests pass with that Vulkan build. Backend discovery exposes CPU only,
+  and `minimax-cli --smoke vulkan` correctly rejects the unavailable device.
+- The host NVIDIA ICD advertises API 1.4.312, but its loader cannot resolve
+  `vkCreateInstance`; `vulkaninfo --summary` exits with
+  `ERROR_INCOMPATIBLE_DRIVER`. Consequently, this machine cannot supply a real
+  Vulkan model run even though the portable backend compiles successfully.
+- Reproducible probe details and binary hashes are captured in
+  `validation/evidence/h100-vulkan-probe.json`. The release gate remains
+  pending by design; build success is not being substituted for runtime proof.
+
+Next: verify the pushed revision through the portable GitHub Actions matrix.
+Real Vulkan, Metal, and Android devices remain the final publication gates.

@@ -4,11 +4,11 @@
   "release_approved": false,
   "gates": {
     "python_dense_parity": {"status": "pass", "evidence": "2026-08-23 H100 Diffusers/GGML CUDA dense condition, DiT, and vocoder gates; validation/evidence/h100-dense.json"},
-    "quantized_profiles": {"status": "pending", "evidence": ""},
-    "cantor_pause_resume": {"status": "pass", "evidence": "2026-08-23 CPU Q4 real-weight minimax-cantor-smoke: CODES/DIFFUSE/DECODE exact, audio_fnv1a64=18291441890909882771; docs/implementation-report.md"},
+    "quantized_profiles": {"status": "pass", "evidence": "2026-08-23 H100 CUDA six-case mixed-component matrix covering all 18 GGUFs; validation/evidence/h100-quantized.json"},
+    "cantor_pause_resume": {"status": "pass", "evidence": "2026-08-23 CPU and H100 CUDA Q4 real-weight minimax-cantor-smoke: CODES/DIFFUSE/DECODE exact; validation/evidence/h100-cuda-runtime.json"},
     "cpu_real_model": {"status": "pass", "evidence": "2026-08-23 CPU Q4 44.1 kHz and 32 kHz finite stereo smokes; docs/implementation-report.md"},
-    "cuda_real_model": {"status": "pending", "evidence": ""},
-    "vulkan_real_model": {"status": "pending", "evidence": ""},
+    "cuda_real_model": {"status": "pass", "evidence": "2026-08-23 H100 Q4 deterministic 44.1 kHz, 32 kHz, and Cantor resume smokes; validation/evidence/h100-cuda-runtime.json"},
+    "vulkan_real_model": {"status": "pending", "evidence": "2026-08-23 Vulkan SDK 1.4.309 build and 12-test suite pass; H100 host ICD cannot create an instance, so a real Vulkan device run remains required; validation/evidence/h100-vulkan-probe.json"},
     "metal_real_model": {"status": "pending", "evidence": ""},
     "android_real_model": {"status": "pending", "evidence": ""}
   }
