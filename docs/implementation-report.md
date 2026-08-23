@@ -117,3 +117,39 @@ stage boundaries before real-model GPU validation.
 
 Next: expose replayable AR, projected-condition, resumable Euler, and decode
 boundaries through the unchanged Cantor engine ABI v1.
+
+## 2026-08-23 — Cantor ABI, durable execution, and publication scaffolding
+
+- Added the unchanged 13-function Cantor engine ABI v1 with the five approved
+  roles and only CODES, DIFFUSE, and DECODE advertised. The shared library
+  exports no other implementation symbols on ELF.
+- Added checksummed, versioned, little-endian durable envelopes with an exact
+  section inventory, 2 GiB limit, component SHA-256 identities, shape/cursor
+  validation, and strict source-boundary nesting.
+- Made AR resumable by replaying `[T,8]` codes to rebuild LM/RVQ KV state while
+  retaining the official position-addressed random coordinates. Completed
+  CODES stores pre-nearest-resize BF16 condition projections.
+- Made the Euler solver resumable after every update. Paused DIFFUSE stores
+  finished windows, the active F32 latent, overlap carries, and its exact
+  window/step cursor. Chunk noise is regenerated from the pinned seed
+  derivation; DECODE uses retry-only cancellation from the complete DIFFUSE
+  boundary.
+- Added the strict Hugging Face publisher/model card and a committed pending
+  release matrix. Publication is immutable and blocked until all real-model
+  parity/backend gates contain passing evidence.
+- Added CI and GitHub Release workflows for Linux CPU/CUDA/Vulkan, macOS Metal,
+  Windows CPU/Vulkan, and Android CPU/Vulkan. Release jobs assert the ABI,
+  include licenses/checksums, and refuse asset replacement.
+- Validation command:
+
+  ```bash
+  cmake -S . -B build-native -DCMAKE_BUILD_TYPE=Release
+  cmake --build build-native -j 4
+  ctest --test-dir build-native --output-on-failure
+  ```
+
+  All eleven current tests pass, including the C ABI smoke, checkpoint
+  corruption vectors, deterministic RNG vectors, and publication policy.
+
+Next: finish the real 18-artifact CPU conversion, record its checksums, then
+move to one H100 80 GiB for dense Python/CUDA parity and resume-boundary tests.

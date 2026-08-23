@@ -23,10 +23,19 @@ add_executable(test-request test-request.cpp)
 target_link_libraries(test-request PRIVATE minimax::core)
 add_test(NAME request-contract COMMAND test-request)
 
+add_executable(test-checkpoint test-checkpoint.cpp)
+target_link_libraries(test-checkpoint PRIVATE minimax::core)
+target_include_directories(test-checkpoint PRIVATE ${PROJECT_SOURCE_DIR}/src)
+add_test(NAME checkpoint-envelope COMMAND test-checkpoint)
+
 if(MINIMAX_BUILD_NATIVE_RUNTIME)
     add_executable(test-seed test-seed.cpp)
     target_link_libraries(test-seed PRIVATE minimax::native)
     add_test(NAME seed-contract COMMAND test-seed)
+
+    add_executable(test-cantor-abi test-cantor-abi.c)
+    target_link_libraries(test-cantor-abi PRIVATE cantor-engine)
+    add_test(NAME cantor-abi COMMAND test-cantor-abi)
 endif()
 
 find_package(Python3 COMPONENTS Interpreter)
@@ -37,4 +46,16 @@ if(Python3_Interpreter_FOUND)
     add_test(NAME conversion-policy
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/python/test_conversion_policy.py
                 ${PROJECT_SOURCE_DIR})
+    add_test(NAME publication-policy
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/python/test_publication_policy.py
+                ${PROJECT_SOURCE_DIR})
+endif()
+
+# Runtime-loadable GGML backends are emitted beside the CLI. Making that the
+# test working directory exercises the same discovery layout as release
+# archives while remaining harmless for statically linked builds.
+get_property(MINIMAX_DIRECTORY_TESTS DIRECTORY PROPERTY TESTS)
+if(MINIMAX_DIRECTORY_TESTS)
+    set_tests_properties(${MINIMAX_DIRECTORY_TESTS} PROPERTIES
+        WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 endif()

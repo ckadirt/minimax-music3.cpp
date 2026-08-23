@@ -1881,6 +1881,10 @@ void convert_tensor_sources_to_gguf(const std::vector<TensorSourceInput> & input
             gguf_set_val_str(gguf, "audiocpp.model_spec.family", model_spec->family.c_str());
             gguf_set_val_str(gguf, "audiocpp.model_spec.json", model_spec->json.c_str());
         }
+        for (const auto & [key, value] : options.string_metadata) {
+            if (key.empty()) throw std::runtime_error("GGUF metadata key must not be empty");
+            gguf_set_val_str(gguf, key.c_str(), value.c_str());
+        }
 
         std::vector<std::string> source_names;
         std::vector<std::string> source_paths;

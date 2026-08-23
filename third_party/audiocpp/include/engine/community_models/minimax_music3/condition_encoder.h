@@ -27,6 +27,11 @@ public:
     ~MiniMaxMusic3ConditionEncoderRuntime();
 
     std::vector<float> encode(const std::vector<float> & frame_hiddens, int64_t frames, int64_t & condition_frames);
+    std::vector<float> project(const std::vector<float> & frame_hiddens, int64_t frames);
+    std::vector<float> resize_projected_nearest(
+        const std::vector<float> & projected,
+        int64_t projected_frames,
+        int64_t & condition_frames) const;
     void release_runtime_graphs();
 
 private:

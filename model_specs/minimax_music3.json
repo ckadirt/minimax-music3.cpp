@@ -80,6 +80,13 @@
         "required": false,
         "min": 0,
         "default": 0
+      },
+      {
+        "name": "flow_seed",
+        "type": "int",
+        "description": "Optional base seed for per-window DIT noise.",
+        "required": false,
+        "min": 0
       }
     ],
     "session": [
@@ -103,21 +110,35 @@
         "type": "string",
         "description": "Language model component GGUF file relative to the model root.",
         "required": false,
-        "default": "language_model_q4_0.gguf"
+        "default": "lm-Q4_K_M.gguf"
       },
       {
         "name": "rvq_depth_decoder_gguf",
         "type": "string",
         "description": "RVQ depth decoder component GGUF file relative to the model root.",
         "required": false,
-        "default": "rvq_depth_decoder_bf16.gguf"
+        "default": "rvq-Q4_K_M.gguf"
+      },
+      {
+        "name": "condition_encoder_gguf",
+        "type": "string",
+        "description": "Condition projection component GGUF relative to the model root.",
+        "required": false,
+        "default": "condition-F32.gguf"
       },
       {
         "name": "flow_transformer_gguf",
         "type": "string",
         "description": "Flow transformer component GGUF file relative to the model root.",
         "required": false,
-        "default": "transformer_q4_0.gguf"
+        "default": "dit-Q4_K_M.gguf"
+      },
+      {
+        "name": "vocoder_gguf",
+        "type": "string",
+        "description": "Stereo vocoder component GGUF relative to the model root.",
+        "required": false,
+        "default": "vae-F16.gguf"
       },
       {
         "name": "graph_context_mb",
@@ -148,18 +169,18 @@
   "package_defaults": {
     "download": {
       "kind": "huggingface_snapshot",
-      "repo": "audio-cpp/MiniMax-Music3-GGUF",
+      "repo": "ckadirt/MiniMax-Music3-GGUF",
       "revision": "main",
       "gated": false
     }
   },
   "packages": [
     {
-      "id": "minimax_music3_q4_0",
-      "display_name": "MiniMax Music 3 Q4_0 GGUF",
+      "id": "minimax_music3_balanced",
+      "display_name": "MiniMax Music 3 Q4_K_M balanced",
       "default": true,
       "format": "gguf",
-      "precision": "q4_0",
+      "precision": "q4_k_m",
       "target_directory": "MiniMax-Music3-GGUF",
       "files": [
         "config.json",
@@ -170,19 +191,19 @@
         "config/vocoder.json",
         "tokenizer/tokenizer.json",
         "tokenizer/tokenizer_config.json",
-        "language_model_q4_0.gguf",
-        "rvq_depth_decoder_q8_0.gguf",
-        "condition_encoder.gguf",
-        "transformer_q4_0.gguf",
-        "vocoder.gguf"
+        "lm-Q4_K_M.gguf",
+        "rvq-Q4_K_M.gguf",
+        "condition-F32.gguf",
+        "dit-Q4_K_M.gguf",
+        "vae-F16.gguf"
       ],
       "strip_prefix": ""
     },
     {
-      "id": "minimax_music3_q8_0",
-      "display_name": "MiniMax Music 3 Q8_0 GGUF",
+      "id": "minimax_music3_quality",
+      "display_name": "MiniMax Music 3 Q6_K quality",
       "format": "gguf",
-      "precision": "q8_0",
+      "precision": "q6_k",
       "target_directory": "MiniMax-Music3-GGUF",
       "files": [
         "config.json",
@@ -193,19 +214,19 @@
         "config/vocoder.json",
         "tokenizer/tokenizer.json",
         "tokenizer/tokenizer_config.json",
-        "language_model_q8_0.gguf",
-        "rvq_depth_decoder_q8_0.gguf",
-        "condition_encoder.gguf",
-        "transformer_q8_0.gguf",
-        "vocoder.gguf"
+        "lm-Q6_K.gguf",
+        "rvq-Q6_K.gguf",
+        "condition-F32.gguf",
+        "dit-Q6_K.gguf",
+        "vae-F16.gguf"
       ],
       "strip_prefix": ""
     },
     {
-      "id": "minimax_music3_bf16",
-      "display_name": "MiniMax Music 3 BF16 GGUF",
+      "id": "minimax_music3_reference",
+      "display_name": "MiniMax Music 3 reference precision",
       "format": "gguf",
-      "precision": "bf16",
+      "precision": "mixed",
       "target_directory": "MiniMax-Music3-GGUF",
       "files": [
         "config.json",
@@ -216,18 +237,18 @@
         "config/vocoder.json",
         "tokenizer/tokenizer.json",
         "tokenizer/tokenizer_config.json",
-        "language_model_bf16.gguf",
-        "rvq_depth_decoder_bf16.gguf",
-        "condition_encoder.gguf",
-        "transformer_bf16.gguf",
-        "vocoder.gguf"
+        "lm-BF16.gguf",
+        "rvq-BF16.gguf",
+        "condition-F32.gguf",
+        "dit-F32.gguf",
+        "vae-F32.gguf"
       ],
       "strip_prefix": ""
     }
   ],
   "dependencies": [],
   "ui": {
-    "recommended_package": "minimax_music3_q4_0",
+    "recommended_package": "minimax_music3_balanced",
     "tags": [
       "Music",
       "GGUF"
@@ -241,7 +262,8 @@
     {
       "format": "gguf",
       "roots": {
-        "model": "."
+        "model": ".",
+        "weights": "$gguf"
       },
       "files": {
         "root_config": "model:config.json",
@@ -252,6 +274,9 @@
         "vocoder_config": "model:config/vocoder.json",
         "tokenizer_json": "model:tokenizer/tokenizer.json",
         "tokenizer_config": "model:tokenizer/tokenizer_config.json"
+      },
+      "tensors": {
+        "component_weights": "weights:"
       }
     },
     {

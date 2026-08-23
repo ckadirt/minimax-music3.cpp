@@ -45,7 +45,8 @@ public:
         int64_t top_k,
         uint64_t seed,
         uint64_t & sample_call_index,
-        uint64_t & rng_offset_blocks);
+        uint64_t & rng_offset_blocks,
+        const std::vector<int32_t> * forced_codes = nullptr);
 
     std::vector<float> feedback_embedding(const std::vector<int32_t> & codes) const;
     void release_runtime_graphs();

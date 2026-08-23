@@ -328,10 +328,17 @@ struct MiniMaxMusic3ArRuntime::Impl {
         assign_batch2_row(hidden, 1, assets->config.qwen.hidden_size, state.uncond.hidden);
     }
 
-    std::vector<float> generate_frame_hiddens(
+    MiniMaxMusic3ArResult generate_frame_hiddens_resumable(
         const MiniMaxMusic3Request & request,
         int64_t target_frames,
+        const std::vector<int32_t> & replay_codes,
+        const std::function<bool(std::size_t, std::size_t)> & should_pause,
         uint64_t & rng_offset_blocks) {
+        const std::size_t codebooks = static_cast<std::size_t>(assets->config.depth.codebooks);
+        if (replay_codes.size() % codebooks != 0 || replay_codes.size() / codebooks >
+            static_cast<std::size_t>(target_frames + 1)) {
+            throw std::runtime_error("MiniMax Music 3 replay code shape mismatch");
+        }
         const auto ar_start = Clock::now();
         const auto prompt = prompt_from_request(request);
         const int64_t prompt_steps = static_cast<int64_t>(prompt.conditional_ids.size());
@@ -342,24 +349,36 @@ struct MiniMaxMusic3ArRuntime::Impl {
         ArStepState state;
         assign_step_outputs(std::move(prefill.logits), prefill.hidden, state);
 
-        std::vector<float> frame_hiddens;
-        frame_hiddens.reserve(static_cast<size_t>(
+        MiniMaxMusic3ArResult result;
+        result.frame_hiddens.reserve(static_cast<size_t>(
             target_frames * assets->config.condition.condition_layers * assets->config.qwen.hidden_size));
+        result.codes.reserve(static_cast<std::size_t>(target_frames + 1) * codebooks);
         uint64_t sample_call_index = 0;
         for (int64_t frame = 0; frame <= target_frames; ++frame) {
-            const int32_t token = sample_semantic_token(
-                prompt,
-                state.logits,
-                assets->config.qwen.vocab_size,
-                semantic_logits,
-                topk_window,
-                compact_candidates,
-                request,
-                sample_call_index,
-                rng_offset_blocks,
-                semantic_scratch,
-                semantic_weights);
+            if (should_pause && should_pause(
+                    static_cast<std::size_t>(frame),
+                    static_cast<std::size_t>(target_frames + 1))) {
+                result.completed = false;
+                break;
+            }
+            const bool replay = static_cast<std::size_t>(frame) < replay_codes.size() / codebooks;
+            const int32_t token = replay
+                ? prompt.audio_code_offset + replay_codes[static_cast<std::size_t>(frame) * codebooks]
+                : sample_semantic_token(
+                      prompt,
+                      state.logits,
+                      assets->config.qwen.vocab_size,
+                      semantic_logits,
+                      topk_window,
+                      compact_candidates,
+                      request,
+                      sample_call_index,
+                      rng_offset_blocks,
+                      semantic_scratch,
+                      semantic_weights);
+            if (replay) ++sample_call_index;
             if (token == prompt.audio_end_token_id) {
+                result.completed = true;
                 break;
             }
             if (token < prompt.audio_code_offset ||
@@ -367,6 +386,12 @@ struct MiniMaxMusic3ArRuntime::Impl {
                 throw std::runtime_error("MiniMax Music 3 sampled token outside semantic audio range");
             }
             const int32_t semantic_code = token - prompt.audio_code_offset;
+            std::vector<int32_t> forced;
+            if (replay) {
+                const auto begin = replay_codes.begin() + static_cast<std::ptrdiff_t>(
+                    static_cast<std::size_t>(frame) * codebooks);
+                forced.assign(begin, begin + static_cast<std::ptrdiff_t>(codebooks));
+            }
             auto depth_codes = depth->generate(
                 state.cond.hidden,
                 state.uncond.hidden,
@@ -375,12 +400,17 @@ struct MiniMaxMusic3ArRuntime::Impl {
                 request.top_k,
                 request.seed,
                 sample_call_index,
-                rng_offset_blocks);
+                rng_offset_blocks,
+                replay ? &forced : nullptr);
+            result.codes.insert(result.codes.end(), depth_codes.codes.begin(), depth_codes.codes.end());
             if (frame > 0) {
-                frame_hiddens.insert(frame_hiddens.end(), state.cond.hidden.begin(), state.cond.hidden.end());
-                frame_hiddens.insert(frame_hiddens.end(), depth_codes.hidden.begin(), depth_codes.hidden.end());
+                result.frame_hiddens.insert(
+                    result.frame_hiddens.end(), state.cond.hidden.begin(), state.cond.hidden.end());
+                result.frame_hiddens.insert(
+                    result.frame_hiddens.end(), depth_codes.hidden.begin(), depth_codes.hidden.end());
             }
             if (frame == target_frames) {
+                result.completed = true;
                 break;
             }
             const auto feedback = depth->feedback_embedding(depth_codes.codes);
@@ -391,7 +421,7 @@ struct MiniMaxMusic3ArRuntime::Impl {
         engine::debug::timing_log_scalar(
             "minimax_music3.ar.total_ms",
             engine::debug::elapsed_ms(ar_start, Clock::now()));
-        return frame_hiddens;
+        return result;
     }
 
     void release_runtime_graphs() {
@@ -436,7 +466,22 @@ std::vector<float> MiniMaxMusic3ArRuntime::generate_frame_hiddens(
     const MiniMaxMusic3Request & request,
     int64_t target_frames,
     uint64_t & rng_offset_blocks) {
-    return impl_->generate_frame_hiddens(request, target_frames, rng_offset_blocks);
+    auto result = impl_->generate_frame_hiddens_resumable(
+        request, target_frames, {}, {}, rng_offset_blocks);
+    if (!result.completed) {
+        throw std::runtime_error("MiniMax Music 3 blocking AR run paused unexpectedly");
+    }
+    return std::move(result.frame_hiddens);
+}
+
+MiniMaxMusic3ArResult MiniMaxMusic3ArRuntime::generate_frame_hiddens_resumable(
+    const MiniMaxMusic3Request & request,
+    int64_t target_frames,
+    const std::vector<int32_t> & replay_codes,
+    const std::function<bool(std::size_t, std::size_t)> & should_pause,
+    uint64_t & rng_offset_blocks) {
+    return impl_->generate_frame_hiddens_resumable(
+        request, target_frames, replay_codes, should_pause, rng_offset_blocks);
 }
 
 void MiniMaxMusic3ArRuntime::release_runtime_graphs() {

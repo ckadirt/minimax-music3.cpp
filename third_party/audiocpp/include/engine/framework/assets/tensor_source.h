@@ -183,6 +183,7 @@ struct GgufConversionOptions {
     std::vector<std::string> excluded_tensor_prefixes;
     std::vector<GgufTensorTypeOverride> type_overrides;
     std::vector<std::string> folded_weight_norm_patterns;
+    std::vector<std::pair<std::string, std::string>> string_metadata;
 };
 void convert_tensor_sources_to_gguf(const std::vector<TensorSourceInput> & inputs,
                                     const std::filesystem::path & output_path, TensorStorageType weight_type,

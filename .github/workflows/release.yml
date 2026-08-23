@@ -1,0 +1,339 @@
+name: Immutable backend releases
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing tag and GitHub Release to build
+        required: true
+        type: string
+      publish:
+        description: Upload without replacing existing assets
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: backend-release-${{ github.event.release.tag_name || inputs.release_tag }}
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: ${{ github.event.release.tag_name || inputs.release_tag }}
+
+jobs:
+  linux:
+    name: Linux x86_64 ${{ matrix.backend }}
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - backend: cpu
+            suffix: cpu
+          - backend: cuda
+            suffix: cuda12
+          - backend: vulkan
+            suffix: vulkan
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          submodules: recursive
+      - name: Install tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends ninja-build patchelf
+      - uses: humbletim/install-vulkan-sdk@v1.2
+        if: matrix.backend == 'vulkan'
+        with:
+          version: 1.4.309.0
+          cache: true
+      - uses: Jimver/cuda-toolkit@v0.2.30
+        if: matrix.backend == 'cuda'
+        with:
+          cuda: 12.8.0
+          method: network
+      - name: Configure portable dynamic backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(
+            -S . -B build -G Ninja
+            -DCMAKE_BUILD_TYPE=Release
+            -DMINIMAX_BUILD_TESTS=ON
+            -DMINIMAX_DYNAMIC_BACKENDS=ON
+            -DBUILD_SHARED_LIBS=ON
+            -DGGML_NATIVE=OFF
+            -DGGML_OPENMP=OFF
+          )
+          case '${{ matrix.backend }}' in
+            vulkan) args+=(-DGGML_VULKAN=ON) ;;
+            cuda)
+              export PATH="${CUDA_PATH:-/usr/local/cuda}/bin:${PATH}"
+              args+=(
+                -DGGML_CUDA=ON
+                '-DCMAKE_CUDA_ARCHITECTURES=75-virtual;80-virtual;86-virtual;89-real;90-real'
+              )
+              ;;
+          esac
+          cmake "${args[@]}" 2>&1 | tee configure.log
+          test "$(grep -c 'Adding CPU backend variant' configure.log || true)" -ge 2
+      - run: cmake --build build --parallel "$(nproc)"
+      - name: Test CPU fallback and ABI
+        shell: bash
+        run: |
+          set -euo pipefail
+          ctest --test-dir build --output-on-failure
+          test "$(nm -D --defined-only build/lib/libcantor_engine.so | awk '{print $3}' | grep -c '^cantor_engine_' || true)" -eq 13
+          LD_LIBRARY_PATH="build/ggml/src:build/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" build/bin/minimax-cli --smoke cpu
+      - name: Package relocatable backend
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          version="${RELEASE_TAG#v}"
+          root="minimax-music3-v${version}-linux-x86_64-${{ matrix.suffix }}"
+          stage="dist/$root"
+          mkdir -p "$stage"
+          install -m 0755 build/bin/minimax-cli build/lib/libcantor_engine.so "$stage/"
+          cp -a build/ggml/src/libggml.so* build/ggml/src/libggml-base.so* "$stage/"
+          cpu=(build/bin/libggml-cpu*.so*)
+          test "${#cpu[@]}" -ge 2
+          cp -a "${cpu[@]}" "$stage/"
+          case '${{ matrix.backend }}' in
+            cuda)
+              gpu=(build/bin/libggml-cuda.so*)
+              test "${#gpu[@]}" -ge 1
+              cp -a "${gpu[@]}" "$stage/"
+              ;;
+            vulkan)
+              gpu=(build/bin/libggml-vulkan.so*)
+              test "${#gpu[@]}" -ge 1
+              cp -a "${gpu[@]}" "$stage/"
+              ;;
+          esac
+          install -m 0644 LICENSE THIRD_PARTY_NOTICES.md README.md include/cantor_engine.h "$stage/"
+          patchelf --set-rpath '$ORIGIN' "$stage/minimax-cli" "$stage/libcantor_engine.so"
+          find "$stage" -type f -name '*.so*' -print0 | xargs -0 -r -n1 patchelf --set-rpath '$ORIGIN'
+          env -u LD_LIBRARY_PATH "$stage/minimax-cli" --smoke cpu
+          env -u LD_LIBRARY_PATH python3 - "$stage/libcantor_engine.so" <<'PY'
+          import ctypes
+          import sys
+          engine = ctypes.CDLL(sys.argv[1])
+          engine.cantor_engine_model.restype = ctypes.c_char_p
+          assert engine.cantor_engine_abi_version() == 1
+          assert engine.cantor_engine_model() == b"minimax-music3"
+          PY
+          archive="$root.tar.gz"
+          tar -C dist -czf "$archive" "$root"
+          sha256sum "$archive" > "$archive.sha256"
+          printf '%s\n' "archive=$archive" "checksum=$archive.sha256" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-x86_64-${{ matrix.suffix }}
+          path: |
+            ${{ steps.package.outputs.archive }}
+            ${{ steps.package.outputs.checksum }}
+          if-no-files-found: error
+      - name: Upload immutable assets
+        if: github.event_name == 'release' || inputs.publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARCHIVE: ${{ steps.package.outputs.archive }}
+          CHECKSUM: ${{ steps.package.outputs.checksum }}
+        run: |
+          set -euo pipefail
+          existing="$(gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name')"
+          for asset in "$ARCHIVE" "$CHECKSUM"; do
+            ! grep -Fqx "$asset" <<<"$existing" || { echo "refusing to overwrite $asset" >&2; exit 1; }
+          done
+          gh release upload "$RELEASE_TAG" "$ARCHIVE" "$CHECKSUM"
+
+  macos:
+    name: macOS arm64 Metal
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          submodules: recursive
+      - run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DGGML_METAL=ON -DGGML_NATIVE=OFF
+      - run: cmake --build build --parallel "$(sysctl -n hw.ncpu)"
+      - run: ctest --test-dir build --output-on-failure
+      - name: Package
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(nm -gU build/lib/libcantor_engine.dylib | awk '{print $3}' | grep -c '^_cantor_engine_' || true)" -eq 13
+          version="${RELEASE_TAG#v}"
+          root="minimax-music3-v${version}-macos-arm64-metal"
+          mkdir -p "dist/$root"
+          install -m 0755 build/bin/minimax-cli build/lib/libcantor_engine.dylib "dist/$root/"
+          install -m 0644 LICENSE THIRD_PARTY_NOTICES.md README.md include/cantor_engine.h "dist/$root/"
+          "dist/$root/minimax-cli" --smoke cpu
+          archive="$root.tar.gz"
+          tar -C dist -czf "$archive" "$root"
+          shasum -a 256 "$archive" > "$archive.sha256"
+          printf '%s\n' "archive=$archive" "checksum=$archive.sha256" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-arm64-metal
+          path: |
+            ${{ steps.package.outputs.archive }}
+            ${{ steps.package.outputs.checksum }}
+          if-no-files-found: error
+      - name: Upload immutable assets
+        if: github.event_name == 'release' || inputs.publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARCHIVE: ${{ steps.package.outputs.archive }}
+          CHECKSUM: ${{ steps.package.outputs.checksum }}
+        run: |
+          existing="$(gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name')"
+          for asset in "$ARCHIVE" "$CHECKSUM"; do
+            ! grep -Fqx "$asset" <<<"$existing" || { echo "refusing to overwrite $asset" >&2; exit 1; }
+          done
+          gh release upload "$RELEASE_TAG" "$ARCHIVE" "$CHECKSUM"
+
+  windows:
+    name: Windows x64 ${{ matrix.backend }}
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: [cpu, vulkan]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          submodules: recursive
+      - uses: humbletim/install-vulkan-sdk@v1.2
+        if: matrix.backend == 'vulkan'
+        with:
+          version: 1.4.309.0
+          cache: true
+      - name: Configure
+        shell: pwsh
+        run: |
+          $args = @('-S', '.', '-B', 'build', '-A', 'x64', '-DBUILD_SHARED_LIBS=OFF', '-DGGML_NATIVE=OFF')
+          if ('${{ matrix.backend }}' -eq 'vulkan') { $args += '-DGGML_VULKAN=ON' }
+          cmake @args
+      - name: Build
+        run: cmake --build build --config Release --parallel 4
+      - run: ctest --test-dir build -C Release --output-on-failure
+      - name: Package
+        id: package
+        shell: pwsh
+        run: |
+          $version = $env:RELEASE_TAG.TrimStart('v')
+          $root = "minimax-music3-v$version-windows-x86_64-${{ matrix.backend }}"
+          New-Item -ItemType Directory -Path "dist/$root" | Out-Null
+          Copy-Item build/bin/Release/minimax-cli.exe "dist/$root/"
+          Copy-Item build/bin/Release/cantor_engine.dll "dist/$root/"
+          Copy-Item LICENSE,THIRD_PARTY_NOTICES.md,README.md,include/cantor_engine.h "dist/$root/"
+          & "dist/$root/minimax-cli.exe" --smoke cpu
+          $archive = "$root.zip"
+          Compress-Archive -Path "dist/$root" -DestinationPath $archive
+          $hash = (Get-FileHash -Algorithm SHA256 $archive).Hash.ToLower()
+          "$hash  $archive" | Set-Content -Encoding ascii -NoNewline "$archive.sha256"
+          "archive=$archive" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "checksum=$archive.sha256" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x86_64-${{ matrix.backend }}
+          path: |
+            ${{ steps.package.outputs.archive }}
+            ${{ steps.package.outputs.checksum }}
+          if-no-files-found: error
+      - name: Upload immutable assets
+        if: github.event_name == 'release' || inputs.publish
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARCHIVE: ${{ steps.package.outputs.archive }}
+          CHECKSUM: ${{ steps.package.outputs.checksum }}
+        run: |
+          $existing = gh release view $env:RELEASE_TAG --json assets --jq '.assets[].name'
+          foreach ($asset in @($env:ARCHIVE, $env:CHECKSUM)) {
+            if ($existing -contains $asset) { throw "refusing to overwrite $asset" }
+          }
+          gh release upload $env:RELEASE_TAG $env:ARCHIVE $env:CHECKSUM
+
+  android:
+    name: Android arm64 ${{ matrix.backend }}
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: [cpu, vulkan]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          submodules: recursive
+      - uses: humbletim/install-vulkan-sdk@v1.2
+        if: matrix.backend == 'vulkan'
+        with:
+          version: 1.4.309.0
+          cache: true
+      - name: Configure and build
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(
+            -S . -B build -G Ninja
+            -DCMAKE_BUILD_TYPE=Release
+            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_LATEST_HOME/build/cmake/android.toolchain.cmake"
+            -DANDROID_ABI=arm64-v8a
+            -DANDROID_PLATFORM=android-28
+            -DMINIMAX_BUILD_TESTS=OFF
+            -DBUILD_SHARED_LIBS=OFF
+            -DGGML_NATIVE=OFF
+            -DGGML_OPENMP=OFF
+          )
+          if [[ '${{ matrix.backend }}' == vulkan ]]; then args+=(-DGGML_VULKAN=ON); fi
+          cmake "${args[@]}"
+          cmake --build build --parallel "$(nproc)"
+      - name: Package
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+          engine=build/lib/libcantor_engine.so
+          test -f "$engine"
+          test "$(readelf --dyn-syms --wide "$engine" | awk '{print $8}' | grep '^cantor_engine_' | sort -u | wc -l)" -eq 13
+          version="${RELEASE_TAG#v}"
+          root="minimax-music3-v${version}-android-arm64-v8a-${{ matrix.backend }}"
+          mkdir -p "dist/$root"
+          install -m 0755 "$engine" "dist/$root/"
+          install -m 0644 LICENSE THIRD_PARTY_NOTICES.md README.md include/cantor_engine.h "dist/$root/"
+          archive="$root.tar.gz"
+          tar -C dist -czf "$archive" "$root"
+          sha256sum "$archive" > "$archive.sha256"
+          printf '%s\n' "archive=$archive" "checksum=$archive.sha256" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-arm64-v8a-${{ matrix.backend }}
+          path: |
+            ${{ steps.package.outputs.archive }}
+            ${{ steps.package.outputs.checksum }}
+          if-no-files-found: error
+      - name: Upload immutable assets
+        if: github.event_name == 'release' || inputs.publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARCHIVE: ${{ steps.package.outputs.archive }}
+          CHECKSUM: ${{ steps.package.outputs.checksum }}
+        run: |
+          existing="$(gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name')"
+          for asset in "$ARCHIVE" "$CHECKSUM"; do
+            ! grep -Fqx "$asset" <<<"$existing" || { echo "refusing to overwrite $asset" >&2; exit 1; }
+          done
+          gh release upload "$RELEASE_TAG" "$ARCHIVE" "$CHECKSUM"

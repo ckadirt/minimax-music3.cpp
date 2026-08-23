@@ -387,11 +387,17 @@ struct MiniMaxMusic3DepthDecoderRuntime::Impl {
         int64_t top_k,
         uint64_t seed,
         uint64_t & sample_call_index,
-        uint64_t & rng_offset_blocks) {
+        uint64_t & rng_offset_blocks,
+        const std::vector<int32_t> * forced_codes) {
         const auto & config = assets->config.depth;
         if (static_cast<int64_t>(last_hidden_cond.size()) != config.hidden_size ||
             static_cast<int64_t>(last_hidden_uncond.size()) != config.hidden_size) {
             throw std::runtime_error("MiniMax Music 3 depth hidden input shape mismatch");
+        }
+        if (forced_codes != nullptr &&
+            (forced_codes->size() != static_cast<std::size_t>(config.codebooks) ||
+             forced_codes->front() != semantic_code)) {
+            throw std::runtime_error("MiniMax Music 3 forced RVQ code shape mismatch");
         }
         last_hidden_scratch.resize(static_cast<size_t>(2 * config.hidden_size));
         std::copy(last_hidden_cond.begin(), last_hidden_cond.end(), last_hidden_scratch.begin());
@@ -436,7 +442,7 @@ struct MiniMaxMusic3DepthDecoderRuntime::Impl {
                 logits[static_cast<size_t>(i)] = uncond + (cond - uncond) * guidance_scale;
             }
             logits.resize(static_cast<size_t>(config.audio_vocab_size));
-            const int32_t code = sample_top_k(
+            int32_t code = sample_top_k(
                 std::move(logits),
                 top_k,
                 seed,
@@ -444,6 +450,12 @@ struct MiniMaxMusic3DepthDecoderRuntime::Impl {
                 rng_offset_blocks,
                 scratch,
                 "MiniMax Music 3 depth");
+            if (forced_codes != nullptr) {
+                code = (*forced_codes)[static_cast<std::size_t>(codebook)];
+                if (code < 0 || code >= config.audio_vocab_size) {
+                    throw std::runtime_error("MiniMax Music 3 forced residual code is out of range");
+                }
+            }
             out_codes.push_back(code);
         }
         return {std::move(out_codes), std::move(out_hidden)};
@@ -522,7 +534,8 @@ MiniMaxMusic3DepthCodes MiniMaxMusic3DepthDecoderRuntime::generate(
     int64_t top_k,
     uint64_t seed,
     uint64_t & sample_call_index,
-    uint64_t & rng_offset_blocks) {
+    uint64_t & rng_offset_blocks,
+    const std::vector<int32_t> * forced_codes) {
     return impl_->generate(
         last_hidden_cond,
         last_hidden_uncond,
@@ -531,7 +544,8 @@ MiniMaxMusic3DepthCodes MiniMaxMusic3DepthDecoderRuntime::generate(
         top_k,
         seed,
         sample_call_index,
-        rng_offset_blocks);
+        rng_offset_blocks,
+        forced_codes);
 }
 
 std::vector<float> MiniMaxMusic3DepthDecoderRuntime::feedback_embedding(const std::vector<int32_t> & codes) const {

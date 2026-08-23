@@ -451,6 +451,7 @@ void print_usage() {
                  "[--bnb-nf4-type q8_0] [--exclude-prefix <logical-prefix>] "
                  "[--keep-type <tensor-prefix>*=<type>] "
                  "[--fold-weight-norm <tensor-prefix>*] "
+                 "[--metadata <key>=<value>] "
                  "[--overwrite] [--no-sidecars] "
                  "[--allow-missing-model-spec]\n"
         << "       audiocpp_gguf --inspect <model.gguf>\n";
@@ -493,7 +494,7 @@ int main(int argc, char ** argv) {
             if ((arg == "--input" || arg == "--output" || arg == "--type" || arg == "--inspect" || arg == "--root" ||
                  arg == "--sidecar" || arg == "--family" || arg == "--model-spec" || arg == "--model-spec-override" ||
                  arg == "--bnb-nf4-type" || arg == "--exclude-prefix" || arg == "--keep-type" ||
-                 arg == "--fold-weight-norm") &&
+                 arg == "--fold-weight-norm" || arg == "--metadata") &&
                 i + 1 < argc) {
                 const std::string value = argv[++i];
                 if (arg == "--input") {
@@ -512,6 +513,14 @@ int main(int argc, char ** argv) {
                     conversion_options.excluded_tensor_prefixes.push_back(value);
                 else if (arg == "--fold-weight-norm")
                     conversion_options.folded_weight_norm_patterns.push_back(value);
+                else if (arg == "--metadata") {
+                    const auto separator = value.find('=');
+                    if (separator == std::string::npos || separator == 0) {
+                        throw std::runtime_error("--metadata requires <key>=<value>");
+                    }
+                    conversion_options.string_metadata.push_back({
+                        value.substr(0, separator), value.substr(separator + 1)});
+                }
                 else if (arg == "--inspect")
                     inspect_path = value;
                 else if (arg == "--root")
@@ -569,9 +578,6 @@ int main(int argc, char ** argv) {
             print_usage();
             return 2;
         }
-        if (!embed_sidecars && !sidecars.empty()) {
-            throw std::runtime_error("--sidecar cannot be combined with --no-sidecars");
-        }
         for (const auto & input : inputs) {
             if (!std::filesystem::is_regular_file(input.path)) {
                 throw std::runtime_error("input tensor file does not exist: " + input.path.string());
@@ -615,6 +621,7 @@ int main(int argc, char ** argv) {
             std::cout << "excluded_prefix=" << prefix << "\n";
         std::cout << "type_overrides=" << conversion_options.type_overrides.size() << "\n";
         std::cout << "folded_weight_norm_patterns=" << conversion_options.folded_weight_norm_patterns.size() << "\n";
+        std::cout << "string_metadata=" << conversion_options.string_metadata.size() << "\n";
         std::cout << "embedded_sidecars=" << (engine::assets::gguf_has_embedded_sidecars(output) ? "true" : "false")
                   << "\n";
         std::cout << "embedded_model_spec=" << (embedded_model_spec.has_value() ? "true" : "false") << "\n";

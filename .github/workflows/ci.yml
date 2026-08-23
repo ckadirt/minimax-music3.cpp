@@ -1,0 +1,158 @@
+name: Portable build and tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: Linux ${{ matrix.backend }}
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: [cpu, vulkan, cuda]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install build tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends ninja-build ccache
+      - name: Install Vulkan SDK
+        if: matrix.backend == 'vulkan'
+        uses: humbletim/install-vulkan-sdk@v1.2
+        with:
+          version: 1.4.309.0
+          cache: true
+      - name: Install CUDA toolkit
+        if: matrix.backend == 'cuda'
+        uses: Jimver/cuda-toolkit@v0.2.30
+        with:
+          cuda: 12.8.0
+          method: network
+      - name: Configure
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(
+            -S . -B build -G Ninja
+            -DCMAKE_BUILD_TYPE=Release
+            -DMINIMAX_BUILD_TESTS=ON
+            -DMINIMAX_DYNAMIC_BACKENDS=ON
+            -DBUILD_SHARED_LIBS=ON
+            -DGGML_NATIVE=OFF
+            -DGGML_OPENMP=OFF
+          )
+          case '${{ matrix.backend }}' in
+            vulkan) args+=(-DGGML_VULKAN=ON) ;;
+            cuda)
+              export PATH="${CUDA_PATH:-/usr/local/cuda}/bin:${PATH}"
+              args+=(
+                -DGGML_CUDA=ON
+                '-DCMAKE_CUDA_ARCHITECTURES=75-virtual;80-virtual;86-virtual;89-real;90-real'
+              )
+              ;;
+          esac
+          cmake "${args[@]}" 2>&1 | tee configure.log
+          test "$(grep -c 'Adding CPU backend variant' configure.log || true)" -ge 2
+      - name: Build
+        run: cmake --build build --parallel "$(nproc)"
+      - name: Run weightless tests through CPU fallback
+        run: ctest --test-dir build --output-on-failure
+      - name: Assert Cantor ABI and requested backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(nm -D --defined-only build/lib/libcantor_engine.so | awk '{print $3}' | grep -c '^cantor_engine_' || true)" -eq 13
+          test "$(find build/bin -maxdepth 1 -name 'libggml-cpu*.so*' -type f | wc -l)" -ge 2
+          case '${{ matrix.backend }}' in
+            vulkan) find build/bin -maxdepth 1 -name 'libggml-vulkan.so*' | grep -q . ;;
+            cuda) find build/bin -maxdepth 1 -name 'libggml-cuda.so*' | grep -q . ;;
+          esac
+          LD_LIBRARY_PATH="build/ggml/src:build/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+            build/bin/minimax-cli --smoke cpu
+
+  macos-metal:
+    name: macOS arm64 Metal
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DGGML_METAL=ON -DGGML_NATIVE=OFF
+      - run: cmake --build build --parallel "$(sysctl -n hw.ncpu)"
+      - run: ctest --test-dir build --output-on-failure
+      - name: Assert Metal and ABI surface
+        run: |
+          build/bin/minimax-cli --smoke cpu
+          build/bin/minimax-cli --list-backends | grep -q $'metal\t'
+          test "$(nm -gU build/lib/libcantor_engine.dylib | awk '{print $3}' | grep -c '^_cantor_engine_' || true)" -eq 13
+
+  windows-cpu:
+    name: Windows x64 CPU
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Configure
+        run: cmake -S . -B build -A x64 -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DGGML_NATIVE=OFF
+      - name: Build
+        run: cmake --build build --config Release --parallel 4
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
+      - name: Smoke
+        shell: pwsh
+        run: .\build\bin\Release\minimax-cli.exe --smoke cpu
+
+  android:
+    name: Android arm64 ${{ matrix.backend }}
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: [cpu, vulkan]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: humbletim/install-vulkan-sdk@v1.2
+        if: matrix.backend == 'vulkan'
+        with:
+          version: 1.4.309.0
+          cache: true
+      - name: Configure Android
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(
+            -S . -B build -G Ninja
+            -DCMAKE_BUILD_TYPE=Release
+            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_LATEST_HOME/build/cmake/android.toolchain.cmake"
+            -DANDROID_ABI=arm64-v8a
+            -DANDROID_PLATFORM=android-28
+            -DMINIMAX_BUILD_TESTS=OFF
+            -DBUILD_SHARED_LIBS=OFF
+            -DGGML_NATIVE=OFF
+            -DGGML_OPENMP=OFF
+          )
+          if [[ '${{ matrix.backend }}' == vulkan ]]; then args+=(-DGGML_VULKAN=ON); fi
+          cmake "${args[@]}"
+      - run: cmake --build build --parallel "$(nproc)"
+      - name: Assert Android engine ABI
+        shell: bash
+        run: |
+          engine=build/lib/libcantor_engine.so
+          test -f "$engine"
+          readelf --dyn-syms --wide "$engine" | awk '{print $8}' | grep '^cantor_engine_' | sort -u | wc -l | grep -qx 13

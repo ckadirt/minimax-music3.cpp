@@ -5,6 +5,8 @@ project(minimax-music3
     DESCRIPTION "Portable MiniMax Music 3 inference with GGML"
     LANGUAGES C CXX)
 
+include(GNUInstallDirs)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -31,6 +33,7 @@ add_subdirectory(ggml)
 find_package(Threads REQUIRED)
 
 add_library(minimax-core STATIC
+    src/minimax-checkpoint.cpp
     src/minimax.cpp
     src/minimax-chunking.cpp
     src/minimax-prompt.cpp
@@ -64,6 +67,34 @@ else()
     target_sources(minimax-core PRIVATE src/minimax-native-stub.cpp)
 endif()
 
+if(MINIMAX_BUILD_NATIVE_RUNTIME)
+    add_library(cantor-engine SHARED src/cantor-abi.cpp)
+    target_link_libraries(cantor-engine PRIVATE minimax::core)
+    target_include_directories(cantor-engine
+        PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_compile_definitions(cantor-engine PRIVATE CANTOR_ENGINE_BUILD=1)
+    target_compile_features(cantor-engine PRIVATE cxx_std_17)
+    if(APPLE)
+        target_link_options(cantor-engine PRIVATE
+            "LINKER:-exported_symbols_list,${CMAKE_CURRENT_SOURCE_DIR}/cantor_engine.exports")
+    elseif(UNIX)
+        target_link_options(cantor-engine PRIVATE
+            "LINKER:--version-script=${CMAKE_CURRENT_SOURCE_DIR}/cantor_engine.map")
+    endif()
+    set_target_properties(cantor-engine PROPERTIES
+        OUTPUT_NAME cantor_engine
+        CXX_VISIBILITY_PRESET hidden
+        VISIBILITY_INLINES_HIDDEN YES
+        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+    if(APPLE)
+        set_target_properties(cantor-engine PROPERTIES INSTALL_RPATH "@loader_path")
+    elseif(UNIX)
+        set_target_properties(cantor-engine PROPERTIES INSTALL_RPATH "$ORIGIN")
+    endif()
+endif()
+
 if(MSVC)
     target_compile_options(minimax-core PRIVATE /W4 /utf-8)
 else()
@@ -77,6 +108,22 @@ set_target_properties(minimax-core minimax-cli PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
 )
+if(APPLE)
+    set_target_properties(minimax-cli PROPERTIES INSTALL_RPATH "@loader_path/../${CMAKE_INSTALL_LIBDIR}")
+elseif(UNIX)
+    set_target_properties(minimax-cli PROPERTIES INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
+endif()
+
+install(TARGETS minimax-cli RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+if(MINIMAX_BUILD_NATIVE_RUNTIME)
+    install(TARGETS cantor-engine
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+endif()
+install(FILES include/cantor_engine.h include/minimax.h include/minimax-request.h
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(FILES LICENSE THIRD_PARTY_NOTICES.md README.md
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/minimax-music3)
 
 if(MINIMAX_BUILD_TESTS)
     enable_testing()

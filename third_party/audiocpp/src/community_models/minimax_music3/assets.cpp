@@ -181,6 +181,42 @@ std::shared_ptr<const MiniMaxMusic3Assets> load_minimax_music3_assets(
     return assets;
 }
 
+std::shared_ptr<const MiniMaxMusic3Assets> load_minimax_music3_component_assets(
+    const std::filesystem::path & language_model,
+    const std::filesystem::path & rvq_depth_decoder,
+    const std::filesystem::path & condition_encoder,
+    const std::filesystem::path & flow_transformer,
+    const std::filesystem::path & vocoder) {
+    const std::vector<std::filesystem::path> paths{
+        language_model, rvq_depth_decoder, condition_encoder, flow_transformer, vocoder};
+    for (const auto & path : paths) {
+        if (!engine::io::is_existing_file(path) || path.extension() != ".gguf") {
+            throw std::runtime_error("MiniMax Music 3 Cantor component is not an existing GGUF: " + path.string());
+        }
+    }
+    auto result = std::make_shared<MiniMaxMusic3Assets>();
+    result->model_root = assets::prepare_model_directory(language_model).model_root;
+    result->tokenizer_json_path = result->model_root / "tokenizer" / "tokenizer.json";
+    result->tokenizer_config_path = result->model_root / "tokenizer" / "tokenizer_config.json";
+    if (!engine::io::is_existing_file(result->tokenizer_json_path) ||
+        !engine::io::is_existing_file(result->tokenizer_config_path)) {
+        throw std::runtime_error("MiniMax Music 3 LM GGUF does not provide the tokenizer sidecars");
+    }
+    result->config.qwen = parse_qwen_config(result->model_root);
+    result->config.depth = parse_depth_config(result->model_root);
+    result->config.condition = parse_condition_config(result->model_root);
+    result->config.flow = parse_flow_config(result->model_root);
+    result->config.vocoder = parse_vocoder_config(result->model_root);
+    validate_pinned_config(result->config);
+    result->language_model_weights = assets::open_tensor_source(language_model);
+    result->depth_decoder_weights = assets::open_tensor_source(rvq_depth_decoder);
+    result->condition_encoder_weights = assets::open_tensor_source(condition_encoder);
+    result->transformer_weights = assets::open_tensor_source(flow_transformer);
+    result->vocoder_weights = assets::open_tensor_source(vocoder);
+    validate_minimax_music3_anchors(*result);
+    return result;
+}
+
 assets::TensorStorageType conv_safe_storage_type(
     const assets::TensorSource & source,
     const std::string & tensor_prefix,

@@ -22,6 +22,12 @@ struct MiniMaxMusic3Assets {
 
 std::shared_ptr<const MiniMaxMusic3Assets> load_minimax_music3_assets(
     const std::filesystem::path & model_path);
+std::shared_ptr<const MiniMaxMusic3Assets> load_minimax_music3_component_assets(
+    const std::filesystem::path & language_model,
+    const std::filesystem::path & rvq_depth_decoder,
+    const std::filesystem::path & condition_encoder,
+    const std::filesystem::path & flow_transformer,
+    const std::filesystem::path & vocoder);
 void validate_minimax_music3_anchors(const MiniMaxMusic3Assets & assets);
 
 // Conv kernels must not be stored BF16: the CUDA im2col path asserts on BF16 kernel

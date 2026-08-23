@@ -336,13 +336,31 @@ public:
     }
 
     void run_sequence(const std::vector<float> & initial_latent) {
-        validate_initial_latent(initial_latent);
+        const auto completed = run_sequence_resumable(initial_latent, 0, {});
+        if (completed != static_cast<int64_t>(config_.schedule.size())) {
+            throw std::runtime_error(config_.label + " blocking sampler paused unexpectedly");
+        }
+    }
+
+    int64_t run_sequence_resumable(
+        const std::vector<float> & current_latent,
+        int64_t completed_steps,
+        const std::function<bool(int64_t, int64_t)> & should_pause) {
+        if (completed_steps < 0 || completed_steps > static_cast<int64_t>(config_.schedule.size())) {
+            throw std::runtime_error(config_.label + " completed step is outside schedule");
+        }
+        if (completed_steps != 0 && !config_.caches.empty()) {
+            throw std::runtime_error(config_.label + " cannot resume a sampler with transient caches");
+        }
+        validate_initial_latent(current_latent);
         reset_sequence_caches();
         const auto begin_updates = denoiser_->begin_sampler_sequence(make_sequence_state());
         apply_cache_updates(begin_updates);
-        latent_ = initial_latent;
-        preserved_latent_ = initial_latent;
-        for (int64_t i = 0; i < static_cast<int64_t>(config_.schedule.size()); ++i) {
+        latent_ = current_latent;
+        preserved_latent_ = current_latent;
+        const int64_t total = static_cast<int64_t>(config_.schedule.size());
+        for (int64_t i = completed_steps; i < total; ++i) {
+            if (should_pause && should_pause(i, total)) return i;
             auto state = make_step_state(i);
             ensure_graph(state);
             auto output = denoiser_->run_sampler_denoiser({state, latent_});
@@ -355,6 +373,7 @@ public:
         if (config_.release_graph_after_sequence) {
             release_runtime_graphs();
         }
+        return total;
     }
 
     void release_runtime_graphs() {
@@ -641,6 +660,13 @@ void FlowSamplerRuntime::run_sequence() {
 
 void FlowSamplerRuntime::run_sequence(const std::vector<float> & initial_latent) {
     impl_->run_sequence(initial_latent);
+}
+
+int64_t FlowSamplerRuntime::run_sequence_resumable(
+    const std::vector<float> & current_latent,
+    int64_t completed_steps,
+    const std::function<bool(int64_t, int64_t)> & should_pause) {
+    return impl_->run_sequence_resumable(current_latent, completed_steps, should_pause);
 }
 
 void FlowSamplerRuntime::release_runtime_graphs() {

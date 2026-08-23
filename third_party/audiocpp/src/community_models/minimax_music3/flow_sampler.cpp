@@ -346,7 +346,7 @@ struct MiniMaxMusic3FlowSamplerRuntime::Impl {
         sampler_guidance_scale = guidance_scale;
     }
 
-    std::vector<float> denoise_chunk(
+    MiniMaxMusic3FlowChunkResult denoise_chunk_resumable(
         const std::vector<float> & condition_values,
         int64_t frames,
         const std::vector<float> & previous_latent,
@@ -354,8 +354,9 @@ struct MiniMaxMusic3FlowSamplerRuntime::Impl {
         const MiniMaxMusic3Request & request,
         uint64_t offset_blocks,
         const sampling::TorchCudaSamplingPolicy & sampling_policy,
-        std::vector<float> & carry_condition,
-        std::vector<float> & carry_latent) {
+        const std::vector<float> & resume_latents,
+        int64_t completed_steps,
+        const std::function<bool(int64_t, int64_t)> & should_pause) {
         const auto & config = assets->config;
         int64_t overlap = 0;
         auto chunk_condition = condition_values;
@@ -365,13 +366,13 @@ struct MiniMaxMusic3FlowSamplerRuntime::Impl {
                 frames);
             copy_condition_prefix(chunk_condition, previous_condition, overlap, config.flow.condition_dim);
         }
-        auto latents = sampling::generate_torch_cuda_tensor_iterator_randn(
+        auto initial_latents = sampling::generate_torch_cuda_tensor_iterator_randn(
             static_cast<size_t>(config.flow.in_channels * frames),
             request.seed,
             offset_blocks,
             sampling_policy,
             sampling::TorchRandnPrecision::BFloat16);
-        auto noise_prompt = latent_tail_window(latents, frames, config.flow.in_channels, 0, overlap);
+        auto noise_prompt = latent_tail_window(initial_latents, frames, config.flow.in_channels, 0, overlap);
         ensure_sampler(
             config.flow.in_channels * frames,
             request.num_inference_steps,
@@ -390,16 +391,26 @@ struct MiniMaxMusic3FlowSamplerRuntime::Impl {
             overlap,
             frames,
             config.flow.in_channels);
-        sampler->run_sequence(latents);
-        latents = sampler->latent();
+        const auto & current_latents = resume_latents.empty() ? initial_latents : resume_latents;
+        MiniMaxMusic3FlowChunkResult result;
+        result.completed_steps = sampler->run_sequence_resumable(
+            current_latents, completed_steps, should_pause);
+        result.latents = sampler->latent();
+        if (result.completed_steps != request.num_inference_steps) {
+            result.completed = false;
+            return result;
+        }
         if (overlap > 0) {
-            copy_latent_prefix(latents, previous_latent, overlap, frames, config.flow.in_channels);
+            copy_latent_prefix(result.latents, previous_latent, overlap, frames, config.flow.in_channels);
         }
         const int64_t overlap_start = std::max<int64_t>(0, frames - 2 * config.overlap_latent_length);
         const int64_t overlap_end = std::max(overlap_start, frames - config.overlap_latent_length);
-        carry_latent = latent_tail_window(latents, frames, config.flow.in_channels, overlap_start, overlap_end);
-        carry_condition = condition_tail_window(chunk_condition, frames, config.flow.condition_dim, overlap_start, overlap_end);
-        return latents;
+        result.carry_latent = latent_tail_window(
+            result.latents, frames, config.flow.in_channels, overlap_start, overlap_end);
+        result.carry_condition = condition_tail_window(
+            chunk_condition, frames, config.flow.condition_dim, overlap_start, overlap_end);
+        result.completed = true;
+        return result;
     }
 
     void release_runtime_graphs() {
@@ -445,7 +456,7 @@ std::vector<float> MiniMaxMusic3FlowSamplerRuntime::denoise_chunk(
     const sampling::TorchCudaSamplingPolicy & sampling_policy,
     std::vector<float> & carry_condition,
     std::vector<float> & carry_latent) {
-    return impl_->denoise_chunk(
+    auto result = impl_->denoise_chunk_resumable(
         condition_values,
         frames,
         previous_latent,
@@ -453,8 +464,39 @@ std::vector<float> MiniMaxMusic3FlowSamplerRuntime::denoise_chunk(
         request,
         offset_blocks,
         sampling_policy,
-        carry_condition,
-        carry_latent);
+        {},
+        0,
+        {});
+    if (!result.completed) {
+        throw std::runtime_error("MiniMax Music 3 blocking flow run paused unexpectedly");
+    }
+    carry_condition = std::move(result.carry_condition);
+    carry_latent = std::move(result.carry_latent);
+    return std::move(result.latents);
+}
+
+MiniMaxMusic3FlowChunkResult MiniMaxMusic3FlowSamplerRuntime::denoise_chunk_resumable(
+    const std::vector<float> & condition_values,
+    int64_t frames,
+    const std::vector<float> & previous_latent,
+    const std::vector<float> & previous_condition,
+    const MiniMaxMusic3Request & request,
+    uint64_t offset_blocks,
+    const sampling::TorchCudaSamplingPolicy & sampling_policy,
+    const std::vector<float> & resume_latents,
+    int64_t completed_steps,
+    const std::function<bool(int64_t, int64_t)> & should_pause) {
+    return impl_->denoise_chunk_resumable(
+        condition_values,
+        frames,
+        previous_latent,
+        previous_condition,
+        request,
+        offset_blocks,
+        sampling_policy,
+        resume_latents,
+        completed_steps,
+        should_pause);
 }
 
 void MiniMaxMusic3FlowSamplerRuntime::release_runtime_graphs() {

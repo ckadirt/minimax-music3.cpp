@@ -19,6 +19,20 @@ SOURCE_INVENTORY = ROOT / "convert" / "source_files.json"
 MODEL_SPEC = ROOT / "model_specs" / "minimax_music3.json"
 CONVERTER_VERSION = "1"
 
+SIDECARS = {
+    "config.json": "config.json",
+    "language_model/config.json": "config/language_model.json",
+    "rvq_depth_decoder/config.json": "config/rvq_depth_decoder.json",
+    "condition_encoder/config.json": "config/condition_encoder.json",
+    "transformer/config.json": "config/transformer.json",
+    "vocoder/config.json": "config/vocoder.json",
+    "scheduler/scheduler_config.json": "config/scheduler.json",
+    "tokenizer/tokenizer.json": "tokenizer/tokenizer.json",
+    "tokenizer/tokenizer_config.json": "tokenizer/tokenizer_config.json",
+    "tokenizer/chat_template.jinja": "tokenizer/chat_template.jinja",
+    "LICENSE": "MODEL_LICENSE",
+}
+
 
 @dataclass(frozen=True)
 class Component:
@@ -133,20 +147,7 @@ def validate_source(source: Path, dry_run: bool) -> dict:
 
 
 def copy_sidecars(source: Path, output: Path) -> None:
-    mapping = {
-        "config.json": "config.json",
-        "language_model/config.json": "config/language_model.json",
-        "rvq_depth_decoder/config.json": "config/rvq_depth_decoder.json",
-        "condition_encoder/config.json": "config/condition_encoder.json",
-        "transformer/config.json": "config/transformer.json",
-        "vocoder/config.json": "config/vocoder.json",
-        "scheduler/scheduler_config.json": "config/scheduler.json",
-        "tokenizer/tokenizer.json": "tokenizer/tokenizer.json",
-        "tokenizer/tokenizer_config.json": "tokenizer/tokenizer_config.json",
-        "tokenizer/chat_template.jinja": "tokenizer/chat_template.jinja",
-        "LICENSE": "MODEL_LICENSE",
-    }
-    for source_name, output_name in mapping.items():
+    for source_name, output_name in SIDECARS.items():
         src, dst = source / source_name, output / output_name
         if not src.is_file():
             raise FileNotFoundError(src)
@@ -164,7 +165,22 @@ def convert_one(args: argparse.Namespace, inventory: dict, component: str, profi
     input_path = args.source / spec.source
     command = [str(args.converter), "--input", str(input_path), "--root", str(args.source),
                "--output", str(output_path), "--type", storage, "--family", "minimax_music3",
-               "--model-spec", str(MODEL_SPEC), "--no-sidecars", "--allow-missing-model-spec"]
+               "--model-spec", str(MODEL_SPEC), "--allow-missing-model-spec"]
+    if component != "lm":
+        command.append("--no-sidecars")
+    for source_name, destination in SIDECARS.items():
+        command.extend(["--sidecar", f"{args.source / source_name}={destination}"])
+    metadata = {
+        "minimax.component": component,
+        "minimax.profile": output_profile,
+        "minimax.source.repository": inventory["repository"],
+        "minimax.source.revision": inventory["revision"],
+        "minimax.source.inventory_sha256": sha256(SOURCE_INVENTORY),
+        "minimax.ggml.revision": "70081fdfc8685b60477b54d9d11cd679c5a00cb1",
+        "minimax.converter.version": CONVERTER_VERSION,
+    }
+    for key, value in metadata.items():
+        command.extend(["--metadata", f"{key}={value}"])
     for override in overrides:
         command.extend(["--keep-type", override])
     print("[plan]", component, output_profile, "->", output_path, flush=True)

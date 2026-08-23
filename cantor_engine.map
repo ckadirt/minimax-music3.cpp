@@ -1,0 +1,18 @@
+CANTOR_ENGINE_1 {
+    global:
+        cantor_engine_abi_version;
+        cantor_engine_model;
+        cantor_engine_version;
+        cantor_engine_stages;
+        cantor_engine_last_error_code;
+        cantor_engine_last_error;
+        cantor_engine_load;
+        cantor_engine_free;
+        cantor_engine_run_stage;
+        cantor_engine_free_blob;
+        cantor_engine_audio;
+        cantor_engine_resident_bytes;
+        cantor_engine_resident_modules;
+    local:
+        *;
+};

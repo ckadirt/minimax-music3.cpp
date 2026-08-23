@@ -48,6 +48,14 @@ build/bin/minimax-cli --generate request.json \
 The pinned sources and implementation order are recorded in
 [`docs/plan.md`](docs/plan.md). Ongoing work and reproducible commands are
 recorded in [`docs/implementation-report.md`](docs/implementation-report.md).
+The exact staged ABI and checkpoint ownership rules are documented in
+[`docs/cantor.md`](docs/cantor.md).
+
+Release workflows compile CPU/CUDA/Vulkan, Metal, Windows, and Android backend
+archives and refuse to replace an existing GitHub Release asset. The model
+publisher verifies the complete matrix and refuses network publication until
+every gate in `validation/release-matrix.json` is explicitly passed with
+evidence.
 
 ## Licenses
 

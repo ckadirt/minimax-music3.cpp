@@ -246,6 +246,10 @@ public:
 
     void run_sequence();
     void run_sequence(const std::vector<float> & initial_latent);
+    int64_t run_sequence_resumable(
+        const std::vector<float> & current_latent,
+        int64_t completed_steps,
+        const std::function<bool(int64_t, int64_t)> & should_pause);
     void release_runtime_graphs();
     void reset_graph_reuse_state();
     void reset_runtime_caches();

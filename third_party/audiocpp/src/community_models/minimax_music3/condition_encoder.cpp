@@ -164,18 +164,11 @@ struct MiniMaxMusic3ConditionEncoderRuntime::Impl {
         condition_frames = output_frames;
     }
 
-    std::vector<float> encode(const std::vector<float> & frame_hiddens, int64_t input_frames, int64_t & out_frames) {
+    std::vector<float> project(const std::vector<float> & frame_hiddens, int64_t input_frames) {
         const auto & config = assets->config.condition;
         const int64_t expected = input_frames * config.condition_layers * config.condition_hidden_dim;
         if (static_cast<int64_t>(frame_hiddens.size()) != expected) {
             throw std::runtime_error("MiniMax Music 3 condition frame hidden shape mismatch");
-        }
-        out_frames = static_cast<int64_t>(
-            static_cast<double>(input_frames) * static_cast<double>(config.output_sample_rate) /
-            static_cast<double>(config.input_sample_rate) * static_cast<double>(config.input_hop_length) /
-            static_cast<double>(config.output_hop_length));
-        if (out_frames <= 0) {
-            throw std::runtime_error("MiniMax Music 3 condition encoder produced non-positive frame count");
         }
         std::vector<float> projected_input(static_cast<size_t>(config.condition_hidden_dim * input_frames), 0.0F);
         for (int64_t frame = 0; frame < input_frames; ++frame) {
@@ -188,20 +181,54 @@ struct MiniMaxMusic3ConditionEncoderRuntime::Impl {
                 }
             }
         }
-        ensure_graph(input_frames, out_frames);
+        ensure_graph(input_frames, input_frames);
         core::write_tensor_f32(input, projected_input);
         if (core::compute_graph(execution, graph, plan, "minimax_music3.condition") != GGML_STATUS_SUCCESS) {
             throw std::runtime_error("MiniMax Music 3 condition graph compute failed");
         }
         auto bct = core::read_tensor_f32(output);
-        std::vector<float> btc(static_cast<size_t>(out_frames * config.out_dim));
+        std::vector<float> btc(static_cast<size_t>(input_frames * config.out_dim));
         for (int64_t channel = 0; channel < config.out_dim; ++channel) {
-            for (int64_t frame = 0; frame < out_frames; ++frame) {
+            for (int64_t frame = 0; frame < input_frames; ++frame) {
                 btc[static_cast<size_t>(frame * config.out_dim + channel)] =
-                    bct[static_cast<size_t>(channel * out_frames + frame)];
+                    bct[static_cast<size_t>(channel * input_frames + frame)];
             }
         }
         return btc;
+    }
+
+    std::vector<float> resize_projected_nearest(
+        const std::vector<float> & projected,
+        int64_t projected_frames,
+        int64_t & out_frames) const {
+        const auto & config = assets->config.condition;
+        if (projected_frames <= 0 || static_cast<int64_t>(projected.size()) != projected_frames * config.out_dim) {
+            throw std::runtime_error("MiniMax Music 3 projected condition shape mismatch");
+        }
+        out_frames = static_cast<int64_t>(
+            static_cast<double>(projected_frames) * static_cast<double>(config.output_sample_rate) /
+            static_cast<double>(config.input_sample_rate) * static_cast<double>(config.input_hop_length) /
+            static_cast<double>(config.output_hop_length));
+        if (out_frames <= 0) {
+            throw std::runtime_error("MiniMax Music 3 condition encoder produced non-positive frame count");
+        }
+        std::vector<float> result(static_cast<std::size_t>(out_frames * config.out_dim));
+        for (int64_t frame = 0; frame < out_frames; ++frame) {
+            const int64_t source = std::min<int64_t>(
+                projected_frames - 1,
+                frame * projected_frames / out_frames);
+            const auto input = projected.begin() + static_cast<std::ptrdiff_t>(source * config.out_dim);
+            std::copy_n(input, static_cast<std::size_t>(config.out_dim),
+                        result.begin() + static_cast<std::ptrdiff_t>(frame * config.out_dim));
+        }
+        return result;
+    }
+
+    std::vector<float> encode(
+        const std::vector<float> & frame_hiddens,
+        int64_t input_frames,
+        int64_t & out_frames) {
+        return resize_projected_nearest(project(frame_hiddens, input_frames), input_frames, out_frames);
     }
 
     std::shared_ptr<const MiniMaxMusic3Assets> assets;
@@ -238,6 +265,19 @@ std::vector<float> MiniMaxMusic3ConditionEncoderRuntime::encode(
     int64_t frames,
     int64_t & condition_frames) {
     return impl_->encode(frame_hiddens, frames, condition_frames);
+}
+
+std::vector<float> MiniMaxMusic3ConditionEncoderRuntime::project(
+    const std::vector<float> & frame_hiddens,
+    int64_t frames) {
+    return impl_->project(frame_hiddens, frames);
+}
+
+std::vector<float> MiniMaxMusic3ConditionEncoderRuntime::resize_projected_nearest(
+    const std::vector<float> & projected,
+    int64_t projected_frames,
+    int64_t & condition_frames) const {
+    return impl_->resize_projected_nearest(projected, projected_frames, condition_frames);
 }
 
 void MiniMaxMusic3ConditionEncoderRuntime::release_runtime_graphs() {

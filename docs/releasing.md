@@ -22,3 +22,26 @@ count, SHA-256, source revision, and quantization policy.
 
 Credentials come from local environment variables or GitHub secrets. Their
 values are never printed, written into manifests, or committed.
+
+## Automation
+
+`.github/workflows/ci.yml` builds weightless CPU, CUDA, Vulkan, Metal, Windows,
+and Android configurations. GPU jobs prove compilation and exercise the CPU
+fallback unless the runner has the corresponding device; this does not count
+as real-model backend validation.
+
+`.github/workflows/release.yml` runs for a published Release or an explicit
+existing tag. It produces GitHub assets for Linux CPU/CUDA/Vulkan, macOS Metal,
+Windows CPU/Vulkan, and Android CPU/Vulkan. Each job checks the 13-symbol ABI,
+packages licenses and the public header, writes a SHA-256 sidecar, and aborts
+if an asset of the same name already exists.
+
+`.github/workflows/publish-model.yml` is manual and restricted to the labelled
+self-hosted publisher because the pinned source plus conversion scratch needs
+at least 140 GiB free. It downloads the exact source inventory, rebuilds all
+18 GGUFs, validates the local publication set, and defaults to a no-mutation
+dry run. A real upload additionally requires every evidence-bearing gate in
+`validation/release-matrix.json` to be `pass` and `release_approved` to be
+true. `convert/publish_hf.py` refuses remote filename collisions and verifies
+remote sizes, LFS SHA-256 metadata, manifests, checksums, license, and model
+card after upload.

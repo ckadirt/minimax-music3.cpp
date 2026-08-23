@@ -1,0 +1,90 @@
+name: Verify and publish GGUF matrix
+
+on:
+  workflow_dispatch:
+    inputs:
+      repo:
+        description: Hugging Face model repository
+        required: true
+        default: ckadirt/MiniMax-Music3-GGUF
+        type: string
+      publish:
+        description: Publish after all committed release gates pass
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: minimax-model-publication
+  cancel-in-progress: false
+
+jobs:
+  convert-and-publish:
+    # The complete conversion needs roughly 140 GiB of temporary/free space.
+    # Use a controlled self-hosted worker; no model bytes enter Actions cache.
+    runs-on: [self-hosted, linux, x64, minimax-model-publisher]
+    timeout-minutes: 1440
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          clean: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Assert workspace capacity
+        shell: bash
+        run: |
+          set -euo pipefail
+          free_kib="$(df -Pk . | awk 'NR==2 {print $4}')"
+          test "$free_kib" -ge 146800640 || {
+            echo 'at least 140 GiB free space is required' >&2
+            exit 1
+          }
+      - name: Build audited converter and tests
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DMINIMAX_BUILD_TESTS=ON \
+            -DGGML_NATIVE=OFF
+          cmake --build build --parallel "$(nproc)"
+          ctest --test-dir build --output-on-failure
+      - name: Download exact pinned checkpoint subset
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: python3 convert/download_model.py --output models/MiniMax-Music3-source --jobs 3
+      - name: Convert complete 18-file matrix
+        run: |
+          python3 convert/convert_model.py \
+            --source models/MiniMax-Music3-source \
+            --output artifacts/gguf \
+            --converter build/bin/minimax-gguf-convert
+      - name: Verify publication set without network mutation
+        run: python3 convert/publish_hf.py --artifacts artifacts/gguf --repo '${{ inputs.repo }}' --dry-run
+      - name: Install pinned Hub client
+        if: inputs.publish
+        run: python3 -m pip install --disable-pip-version-check 'huggingface_hub[hf_xet]==1.1.7'
+      - name: Publish immutably and verify remote metadata
+        if: inputs.publish
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: python3 convert/publish_hf.py --artifacts artifacts/gguf --repo '${{ inputs.repo }}'
+      - name: Write artifact summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '### MiniMax Music 3 GGUF publication run'
+            echo
+            if compgen -G 'artifacts/gguf/*.gguf' >/dev/null; then
+              echo '| Artifact | Bytes |'
+              echo '| --- | ---: |'
+              find artifacts/gguf -maxdepth 1 -type f -name '*.gguf' -printf '%f %s\n' \
+                | sort | awk '{printf "| `%s` | %s |\n", $1, $2}'
+            else
+              echo 'No complete GGUF artifacts were produced.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

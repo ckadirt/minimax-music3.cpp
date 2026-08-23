@@ -33,13 +33,15 @@ The runtime owns five independently selectable components: `lm`, `rvq`,
 `condition`, `dit`, and `vae`.
 
 - CODES loads LM/RVQ and, after AR completion, condition projection weights.
-  A paused prefix stores codes and RNG state and rebuilds KV state by replay.
+  A paused prefix stores codes; its replay length identifies the next official
+  position-addressed random coordinate and rebuilds KV state by replay.
 - A completed CODES state stores window-specific, pre-resize BF16 condition
   projections. This is mathematically equivalent to rounding the resized
   nearest-neighbor output and reduces the five-minute boundary from roughly
   562.5 MiB of raw BF16 hidden states to roughly 69.5 MiB.
 - DIFFUSE loads only the DiT and stores completed latents, the current Euler
-  position, overlap carry, RNG state, settings, and component identities.
+  position/latent, overlap carry, deterministic seed context, settings, and
+  component identities.
 - DECODE loads only the VAE. Cancellation retries from the durable DIFFUSE
   boundary rather than serializing a partial waveform graph.
 
