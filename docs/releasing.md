@@ -9,8 +9,7 @@ libraries, runnable CLI tools where supported, NOTICE/license files, a build
 manifest, and SHA-256 sidecar.
 
 Release workflows refuse to replace an existing GitHub asset. The Cantor
-backend manifest uses immutable GitHub Release URLs and exact checksums. R2 is
-not part of this repository's v0.1 release path.
+backend manifest uses immutable GitHub Release URLs and exact checksums.
 
 ## Model publication
 
@@ -45,3 +44,29 @@ dry run. A real upload additionally requires every evidence-bearing gate in
 true. `convert/publish_hf.py` refuses remote filename collisions and verifies
 remote sizes, LFS SHA-256 metadata, manifests, checksums, license, and model
 card after upload.
+
+## Cantor checkpoint tiers on Cloudflare R2
+
+`publish/cloudflare-r2.json` is the machine-readable source for the three
+Cantor checkpoint bundles and every public object URL:
+
+- `1.0-fast`: Q4_K_M LM/RVQ/DiT, F32 condition, F16 VAE
+- `1.0-balanced`: Q6_K LM/RVQ/DiT, F32 condition, F16 VAE
+- `1.0-quality`: BF16 LM/RVQ, F32 condition/DiT/VAE
+
+The three bundles share content-addressed components and use 12 unique GGUFs.
+`convert/publish_r2.py` validates all 46,148,926,304 model bytes against their
+conversion manifests and hashes before upload. It publishes beneath the
+versioned `minimax-music3-1.0/` prefix, records each SHA-256 in R2 metadata,
+refuses to replace a mismatching object, verifies byte counts through the
+public custom domain, and also publishes the model license and bundle manifest.
+
+```sh
+python3 convert/publish_r2.py --artifacts artifacts/gguf
+python3 convert/publish_r2.py --artifacts artifacts/gguf --upload
+```
+
+The second command requires `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`,
+`R2_ENDPOINT_URL`, and `R2_BUCKET`. Credential values are never committed or
+printed. The public Cantor catalog should be deployed only after matching
+`minimax-music3` ABI v1 backend archives are present in its backend manifest.
