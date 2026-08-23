@@ -32,6 +32,20 @@ endif()
 add_subdirectory(ggml)
 find_package(Threads REQUIRED)
 
+# Android's NDK provides the Vulkan loader and C headers but not vulkan.hpp.
+# GGML's Vulkan backend uses Vulkan-Hpp, so cross-builds take that header from
+# the pinned SDK installed on the host while still linking the NDK loader.
+if(ANDROID AND GGML_VULKAN)
+    find_path(MINIMAX_VULKAN_HPP_INCLUDE_DIR
+        NAMES vulkan/vulkan.hpp
+        HINTS "$ENV{VULKAN_SDK}/include"
+        NO_DEFAULT_PATH)
+    if(NOT MINIMAX_VULKAN_HPP_INCLUDE_DIR)
+        message(FATAL_ERROR "Android Vulkan build requires VULKAN_SDK/include/vulkan/vulkan.hpp")
+    endif()
+    target_include_directories(ggml-vulkan PRIVATE "${MINIMAX_VULKAN_HPP_INCLUDE_DIR}")
+endif()
+
 add_library(minimax-core STATIC
     src/minimax-checkpoint.cpp
     src/minimax.cpp
@@ -56,6 +70,7 @@ target_include_directories(minimax-core
 )
 target_link_libraries(minimax-core PUBLIC ggml::ggml Threads::Threads)
 target_compile_definitions(minimax-core PUBLIC MINIMAX_VERSION="${PROJECT_VERSION}")
+target_compile_definitions(minimax-core PRIVATE UTF8PROC_STATIC)
 target_compile_features(minimax-core PUBLIC cxx_std_17)
 
 if(MINIMAX_BUILD_NATIVE_RUNTIME)
