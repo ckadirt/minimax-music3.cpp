@@ -300,8 +300,14 @@ jobs:
           )
           if [[ '${{ matrix.backend }}' == vulkan ]]; then
             spirv_config="$(find "$VULKAN_SDK" -type f \( -name 'SPIRV-HeadersConfig.cmake' -o -name 'spirv-headers-config.cmake' \) -print -quit)"
+            vulkan_hpp="$(find "$VULKAN_SDK" -type f -path '*/vulkan/vulkan.hpp' -print -quit)"
             test -n "$spirv_config"
-            args+=(-DGGML_VULKAN=ON "-DSPIRV-Headers_DIR=$(dirname "$spirv_config")")
+            test -n "$vulkan_hpp"
+            args+=(
+              -DGGML_VULKAN=ON
+              "-DSPIRV-Headers_DIR=$(dirname "$spirv_config")"
+              "-DMINIMAX_VULKAN_HPP_INCLUDE_DIR=$(dirname "$(dirname "$vulkan_hpp")")"
+            )
           fi
           cmake "${args[@]}"
           cmake --build build --parallel "$(nproc)"
