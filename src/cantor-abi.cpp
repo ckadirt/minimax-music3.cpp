@@ -675,10 +675,7 @@ cantor_status run_flow(cantor_ctx & context, const std::uint8_t * input, std::si
     }
 
     auto native = native_request(request);
-    const auto policy = engine::sampling::resolve_torch_cuda_sampling_policy(
-        context.execution->backend_type(), context.execution->config().device,
-        "minimax_music3.cantor.flow", "MiniMax Music 3 Cantor flow",
-        engine::sampling::TorchCudaSamplingPolicyFailureMode::FallbackToDefault);
+    const auto policy = mm3::minimax_music3_flow_sampling_policy();
     context.resident_modules = 1;
     mm3::MiniMaxMusic3FlowSamplerRuntime flow(
         context.assets, *context.execution, graph_arena_bytes, weight_context_bytes,

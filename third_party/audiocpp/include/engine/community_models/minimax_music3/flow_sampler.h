@@ -17,6 +17,12 @@ struct MiniMaxMusic3FlowChunkResult {
     bool completed = false;
 };
 
+// The largest MiniMax acoustic window uses fewer than 1024 CUDA
+// TensorIterator blocks. Pinning a non-capped launch geometry reproduces the
+// official CUDA Philox element mapping without making the generated noise
+// depend on the backend or physical GPU's SM count.
+sampling::TorchCudaSamplingPolicy minimax_music3_flow_sampling_policy();
+
 class MiniMaxMusic3FlowSamplerRuntime {
 public:
     MiniMaxMusic3FlowSamplerRuntime(

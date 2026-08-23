@@ -1,6 +1,9 @@
 #include "engine/community_models/minimax_music3/seed.h"
+#include "engine/community_models/minimax_music3/flow_sampler.h"
+#include "engine/framework/sampling/torch_random.h"
 
 #include <cassert>
+#include <cmath>
 #include <cstdint>
 #include <vector>
 
@@ -26,5 +29,19 @@ int main() {
     const std::vector<float> scores{0.0F, 0.0F, 0.0F};
     const auto first = seeded_gumbel_argmax(scores, 1398456984U, 8);
     assert(first == seeded_gumbel_argmax(scores, 1398456984U, 8));
+
+    const auto policy = minimax_music3_flow_sampling_policy();
+    assert(policy.multiprocessor_count == 1024);
+    assert(policy.max_threads_per_multiprocessor == 256);
+    assert(!policy.cuda_fast_path);
+    const auto noise = engine::sampling::generate_torch_cuda_tensor_iterator_randn(
+        1025, derive_dit_chunk_seed(42, 0), 0, policy,
+        engine::sampling::TorchRandnPrecision::Float32);
+    const auto repeated = engine::sampling::generate_torch_cuda_tensor_iterator_randn(
+        1025, derive_dit_chunk_seed(42, 0), 0, policy,
+        engine::sampling::TorchRandnPrecision::Float32);
+    assert(noise == repeated);
+    assert(noise.size() == 1025);
+    for (float value : noise) assert(std::isfinite(value));
     return 0;
 }

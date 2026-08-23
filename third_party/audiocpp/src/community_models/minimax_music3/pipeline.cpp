@@ -87,12 +87,7 @@ struct MiniMaxMusic3PipelineRuntime::Impl {
           weight_context_bytes(weight_context_bytes),
           storage_type(storage_type),
           memory_saver(memory_saver),
-          sampling_policy(sampling::resolve_torch_cuda_sampling_policy(
-              execution.backend_type(),
-              execution.config().device,
-              "minimax_music3.flow.sampling",
-              "MiniMax Music 3 flow",
-              sampling::TorchCudaSamplingPolicyFailureMode::FallbackToDefault)) {
+          sampling_policy(minimax_music3_flow_sampling_policy()) {
         if (assets == nullptr) {
             throw std::runtime_error("MiniMax Music 3 pipeline requires assets");
         }

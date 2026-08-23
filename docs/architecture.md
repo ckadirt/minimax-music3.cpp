@@ -13,6 +13,13 @@ resizes the result to the 44.1 kHz latent timeline. A 36-layer flow transformer
 integrates 128-channel latents. The vocoder upsamples each latent frame by 512
 samples and produces stereo 44.1 kHz audio.
 
+The flow solver retains F32 noise, velocity, and Euler state, matching the
+pinned F32 acoustic oracle. Its Philox TensorIterator geometry is fixed above
+the largest possible window grid, so the official CUDA element mapping is
+identical on CPU, CUDA, HIP, Vulkan, and Metal and is not a function of GPU SM
+count. The completed CODES boundary alone rounds projected conditions to BF16;
+the ordinary path applies the same boundary rounding before diffusion.
+
 | Property | Value |
 | --- | ---: |
 | Prompt limit | 5,000 tokens |

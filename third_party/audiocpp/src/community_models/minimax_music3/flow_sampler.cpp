@@ -265,7 +265,6 @@ public:
         for (size_t i = 0; i < input.latent.size(); ++i) {
             input.latent[i] += dt * input.prediction[i];
         }
-        core::round_f32_to_bf16_in_place(input.latent);
     }
 
 private:
@@ -292,6 +291,15 @@ private:
 };
 
 }  // namespace
+
+sampling::TorchCudaSamplingPolicy minimax_music3_flow_sampling_policy() {
+    sampling::TorchCudaSamplingPolicy policy;
+    policy.multiprocessor_count = 1024;
+    policy.max_threads_per_multiprocessor = 256;
+    policy.cuda_fast_path = false;
+    policy.cuda_device_index = 0;
+    return policy;
+}
 
 struct MiniMaxMusic3FlowSamplerRuntime::Impl {
     Impl(
@@ -371,7 +379,7 @@ struct MiniMaxMusic3FlowSamplerRuntime::Impl {
             request.seed,
             offset_blocks,
             sampling_policy,
-            sampling::TorchRandnPrecision::BFloat16);
+            sampling::TorchRandnPrecision::Float32);
         auto noise_prompt = latent_tail_window(initial_latents, frames, config.flow.in_channels, 0, overlap);
         ensure_sampler(
             config.flow.in_channels * frames,
