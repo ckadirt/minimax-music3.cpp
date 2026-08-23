@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "status": "pass",
+  "prefix": "minimax-music3-1.0/",
+  "manifest_url": "https://cantor-ckpts.ckadirt.xyz/minimax-music3-1.0/manifest.json",
+  "manifest_sha256": "2143899066fb37700da284b7426b0d046bf34af6ec32c2221e46799d88b62600",
+  "unique_ggufs": 12,
+  "unique_model_bytes": 46148926304,
+  "remote_objects": 14,
+  "remote_total_bytes": 46148942760,
+  "public_objects_verified": 14,
+  "variants": {
+    "1.0-fast": {"total_bytes": 8117802016, "primary_quant": "Q4_K_M"},
+    "1.0-balanced": {"total_bytes": 9823284224, "primary_quant": "Q6_K"},
+    "1.0-quality": {"total_bytes": 28517696672, "primary_quant": "BF16/F32"}
+  },
+  "cantor_catalog": {
+    "repository": "ckadirt/Cantor",
+    "branch": "levo2-engine-family",
+    "commit": "186983e",
+    "status": "staged",
+    "deployment_gate": "Publish minimax-music3 ABI v1 backend artifacts before merging/deploying the catalog entry."
+  }
+}

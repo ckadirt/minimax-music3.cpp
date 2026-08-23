@@ -283,3 +283,29 @@ the Vulkan gate as pending and proceed to portable CI for the CUDA changes.
 
 Next: verify the pushed revision through the portable GitHub Actions matrix.
 Real Vulkan, Metal, and Android devices remain the final publication gates.
+
+## 2026-08-23 — Cantor fast/balanced/quality tiers on Cloudflare R2
+
+- Selected three monotonic storage tiers following the existing Cantor/LeVo2
+  convention: Q4_K_M `1.0-fast`, Q6_K `1.0-balanced`, and reference-precision
+  BF16/F32 `1.0-quality`. Every tier contains the five ABI roles `lm`, `rvq`,
+  `condition`, `dit`, and `vae`.
+- The bundle totals are 8,117,802,016, 9,823,284,224, and 28,517,696,672
+  bytes. Shared condition/VAE objects reduce the union to 12 GGUFs and
+  46,148,926,304 bytes.
+- `convert/publish_r2.py` rehashed the complete union, uploaded it immutably to
+  `minimax-music3-1.0/`, verified R2 byte counts and SHA-256 metadata, then
+  verified all 14 public URLs (12 GGUFs, license, and manifest). The local and
+  public manifest SHA-256 is
+  `2143899066fb37700da284b7426b0d046bf34af6ec32c2221e46799d88b62600`.
+- The final machine-readable bundle is public at
+  `https://cantor-ckpts.ckadirt.xyz/minimax-music3-1.0/manifest.json`; compact
+  publication evidence is in `validation/evidence/cloudflare-r2.json`.
+- Added all three variants to Cantor commit `186983e` on its existing
+  `levo2-engine-family` branch. Relay tests, type checks, asset checks, and the
+  Wrangler deploy dry-run pass. The live catalog deployment remains staged
+  until `backends/v1.json` has matching `minimax-music3` ABI v1 archives, so
+  nodes are not offered a checkpoint without an executable engine.
+
+Next: complete portable CI on the updated publisher policy and build the
+immutable MiniMax Cantor backend archives before activating the catalog entry.
