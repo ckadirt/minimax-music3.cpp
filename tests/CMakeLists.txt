@@ -54,11 +54,11 @@ if(Python3_Interpreter_FOUND)
                 ${PROJECT_SOURCE_DIR})
 endif()
 
-# Runtime-loadable GGML backends are emitted beside the CLI. Making that the
-# test working directory exercises the same discovery layout as release
-# archives while remaining harmless for statically linked builds.
+# Runtime-loadable GGML backends and the Windows Cantor DLL are emitted beside
+# the CLI. Use the target directory rather than a literal build/bin path so
+# multi-config generators select build/bin/Release as well.
 get_property(MINIMAX_DIRECTORY_TESTS DIRECTORY PROPERTY TESTS)
 if(MINIMAX_DIRECTORY_TESTS)
     set_tests_properties(${MINIMAX_DIRECTORY_TESTS} PROPERTIES
-        WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+        WORKING_DIRECTORY "$<TARGET_FILE_DIR:minimax-cli>")
 endif()
