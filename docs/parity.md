@@ -23,6 +23,13 @@ python3 parity/run_dense.py \
   --source models/MiniMax-Music3-source \
   --gguf artifacts/gguf \
   --binary build-cuda/bin/minimax-parity
+
+# The request must use at least two Euler steps so the harness can pause after
+# a completed update and resume from the serialized F32 latent.
+build-cuda/bin/minimax-cantor-smoke \
+  --model artifacts/gguf \
+  --request artifacts/cantor-smoke-request.json \
+  --threads 4
 ```
 
 `fixture-spec.json` freezes the random-input generator, shapes, revisions, and
@@ -32,6 +39,14 @@ the dense condition, two-branch DiT velocity, and planar stereo vocoder
 boundaries through the selected GGML backend. `compare.py` rejects shape,
 non-finite, maximum-error, or relative-RMS failures and emits a compact hashed
 summary. Raw `.f32` files remain under the ignored `artifacts/` tree.
+`minimax-cantor-smoke` separately proves that CODES and DIFFUSE resumed
+boundaries are byte-identical to uninterrupted execution, and that a cancelled
+DECODE retains no partial audio while a retry returns byte-identical planar
+F32 output. It rejects non-finite or silent audio and prints a compact result
+record suitable for release evidence.
+The DiT component runner also executes every fixture twice and requires an
+exact match before comparing with Python. This guards the GGML graph against
+destructive reuse and stale backend graph-cache state.
 
 ## Initial numerical gates
 

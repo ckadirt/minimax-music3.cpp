@@ -156,7 +156,7 @@ struct MiniMaxMusic3FlowTransformerRuntime::Impl {
 
     void release_runtime_graphs() {
         if (graph != nullptr) {
-            core::release_backend_graph_resources(execution.backend(), graph);
+            core::release_backend_graph_resources(execution.backend(), graph, true);
         }
         graph = nullptr;
         latents = {};
@@ -313,6 +313,11 @@ struct MiniMaxMusic3FlowTransformerRuntime::Impl {
             static_cast<int64_t>(input_condition.size()) != config.condition_dim * frames) {
             throw std::runtime_error("MiniMax Music 3 flow input shape mismatch");
         }
+        // The gallocr may select destructive in-place aliases for this graph.
+        // A second compute of the same graph therefore does not represent a
+        // pure transformer forward. Rebuild only the graph allocations for
+        // every Euler evaluation; the component weights remain resident.
+        release_runtime_graphs();
         ensure_graph(frames);
         if (condition_frames != frames ||
             condition_batch.size() != static_cast<size_t>(2 * config.condition_dim * frames)) {

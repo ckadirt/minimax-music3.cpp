@@ -137,6 +137,12 @@ if(MINIMAX_BUILD_PARITY_TOOLS)
     target_link_libraries(minimax-parity PRIVATE minimax::native)
     set_target_properties(minimax-parity PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+
+    add_executable(minimax-cantor-smoke tools/minimax-cantor-smoke.cpp)
+    target_link_libraries(minimax-cantor-smoke PRIVATE cantor-engine minimax::core)
+    target_include_directories(minimax-cantor-smoke PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    set_target_properties(minimax-cantor-smoke PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 endif()
 
 install(TARGETS minimax-cli RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})

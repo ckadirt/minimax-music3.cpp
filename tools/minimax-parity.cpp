@@ -208,6 +208,11 @@ std::vector<float> run_dit(
         assets, execution, kGraphArenaBytes, kWeightContextBytes, TensorStorageType::Native);
     runtime.prepare_chunk_condition(condition, options.frames);
     auto output = runtime.predict_velocity_branches(latents, condition, options.frames, options.timestep);
+    const auto repeated = runtime.predict_velocity_branches(
+        latents, condition, options.frames, options.timestep);
+    if (output != repeated) {
+        throw std::runtime_error("DiT graph is not bit-exact when repeated with identical inputs");
+    }
     shape = {2, config.in_channels, options.frames};
     return output;
 }

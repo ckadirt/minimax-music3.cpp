@@ -153,3 +153,49 @@ boundaries through the unchanged Cantor engine ABI v1.
 
 Next: finish the real 18-artifact CPU conversion, record its checksums, then
 move to one H100 80 GiB for dense Python/CUDA parity and resume-boundary tests.
+
+## 2026-08-23 — complete artifact matrix and real CPU validation
+
+- Completed all 18 planned GGUFs with streaming conversion: five LM, five
+  RVQ, one condition, five DiT, and two VAE profiles. The GGUF payload total is
+  exactly 67,320,282,560 bytes. `convert/publish_hf.py --dry-run` re-hashed the
+  entire matrix and accepted every manifest, canonical checksum, pinned source
+  revision, and pinned GGML revision; it performed no upload.
+- Added `minimax-cantor-smoke`, a real-weight release harness. It compares
+  uninterrupted and paused/resumed CODES and DIFFUSE boundaries byte-for-byte,
+  verifies cancelled DECODE retains no partial audio, retries the immutable
+  DIFFUSE state, and requires byte-identical finite non-silent planar output.
+- That harness exposed destructive reuse of the imported DiT GGML graph: an
+  identical second forward changed its first velocity value from `0.122267008`
+  to `-3.03268623`. DiT inference now rebuilds graph allocations for every
+  Euler evaluation while keeping weights resident, and evicts the corresponding
+  CUDA/HIP graph-cache entry. The dense parity runner repeats identical DiT
+  inputs to prevent this regression.
+- After the fix, the real Q4 Cantor harness reports exact CODES, DIFFUSE, and
+  DECODE resume equivalence, 3,072 samples per stereo channel at 44,100 Hz,
+  peak `0.00836946`, RMS `0.00224306`, and audio FNV-1a-64
+  `18291441890909882771`.
+- The standalone real Q4 CLI produced deterministic 44.1 kHz stereo twice with
+  identical WAV SHA-256
+  `7d7af5c688711f7ec1ad645d4df7348ffc5382e3d378cdda1dff0cb69053c5b9`
+  (1,536 frames, peak PCM16 453, RMS 145.119989). The 32 kHz serving path also
+  produced finite non-silent stereo (1,115 frames) with SHA-256
+  `aa61fd18b4e1cdd8fd29ea4e07c7b4c443de37f1917fd097be677d057b17c658`.
+- All 12 weightless/native contract tests pass locally. Cross-compilation has
+  separately reached green on Linux CPU/Vulkan, macOS Metal, Windows CPU, and
+  Android CPU/Vulkan; the final post-fix CI run is still required before a
+  release is approved.
+
+Validation commands:
+
+```bash
+python3 convert/publish_hf.py --artifacts artifacts/gguf \
+  --repo ckadirt/MiniMax-Music3-GGUF --dry-run
+build-minimal-make/bin/minimax-cli --generate artifacts/cpu-smoke-request.json \
+  --model artifacts/gguf --output artifacts/cpu-smoke.wav --backend cpu --threads 4
+build-minimal-make/bin/minimax-cantor-smoke --model artifacts/gguf \
+  --request artifacts/cantor-smoke-request.json --threads 4
+```
+
+Next: run the final portable CI matrix, then move to one H100 80 GiB for dense
+Diffusers/CUDA parity, all quantized-profile smokes, and CUDA resume evidence.

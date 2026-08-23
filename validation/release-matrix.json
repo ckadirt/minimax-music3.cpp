@@ -5,8 +5,8 @@
   "gates": {
     "python_dense_parity": {"status": "pending", "evidence": ""},
     "quantized_profiles": {"status": "pending", "evidence": ""},
-    "cantor_pause_resume": {"status": "pending", "evidence": ""},
-    "cpu_real_model": {"status": "pending", "evidence": ""},
+    "cantor_pause_resume": {"status": "pass", "evidence": "2026-08-23 CPU Q4 real-weight minimax-cantor-smoke: CODES/DIFFUSE/DECODE exact, audio_fnv1a64=18291441890909882771; docs/implementation-report.md"},
+    "cpu_real_model": {"status": "pass", "evidence": "2026-08-23 CPU Q4 44.1 kHz and 32 kHz finite stereo smokes; docs/implementation-report.md"},
     "cuda_real_model": {"status": "pending", "evidence": ""},
     "vulkan_real_model": {"status": "pending", "evidence": ""},
     "metal_real_model": {"status": "pending", "evidence": ""},
