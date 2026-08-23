@@ -24,3 +24,31 @@ the next resumable step.
   approximately 69.5 MiB at five minutes rather than raw hidden states.
 
 Next: add the pinned GGML/build scaffold and weightless contract tests.
+
+## 2026-08-23 — pinned GGML and weightless core scaffold
+
+- Added `ckadirt/ggml` at `70081fdfc8685b60477b54d9d11cd679c5a00cb1`
+  as a submodule and a C++17 core/CLI build.
+- Added backend discovery and a real GGML vector-add smoke. The current CPU
+  backend returns the expected `5 5 5 5` result.
+- Adapted the proven Qwen2 byte-level BPE and vendored Unicode/NFC support,
+  retaining their licenses and modification notices.
+- Ported the pinned caption cleanup and lyric normalization rules. In
+  particular, text placed after a leading structure tag on the same line is
+  dropped because that is the official prompt contract.
+- Added the exact acoustic window geometry and completed-CODES projected-state
+  calculation. The tests freeze 7 windows and 5,529,600 bytes at 750 frames,
+  and 89 windows and 72,908,800 bytes at 9,000 frames.
+- Validation command:
+
+  ```bash
+  cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+  cmake --build build -j 4
+  ctest --test-dir build --output-on-failure
+  ```
+
+  All four tests pass: CPU backend smoke, chunking contract, prompt
+  normalization, and tokenizer contract.
+
+Next: add strict request/config parsing and the component GGUF conversion
+inventory before importing weight-owning model graphs.
