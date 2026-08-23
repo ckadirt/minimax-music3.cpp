@@ -49,6 +49,7 @@ jobs:
             -S . -B build -G Ninja
             -DCMAKE_BUILD_TYPE=Release
             -DMINIMAX_BUILD_TESTS=ON
+            -DMINIMAX_BUILD_PARITY_TOOLS=ON
             -DMINIMAX_DYNAMIC_BACKENDS=ON
             -DBUILD_SHARED_LIBS=ON
             -DGGML_NATIVE=OFF
@@ -60,7 +61,7 @@ jobs:
               export PATH="${CUDA_PATH:-/usr/local/cuda}/bin:${PATH}"
               args+=(
                 -DGGML_CUDA=ON
-                '-DCMAKE_CUDA_ARCHITECTURES=75-virtual;80-virtual;86-virtual;89-real;90-real'
+                '-DCMAKE_CUDA_ARCHITECTURES=75-virtual;90-real'
               )
               ;;
           esac
