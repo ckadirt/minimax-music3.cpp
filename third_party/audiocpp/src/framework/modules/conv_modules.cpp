@@ -184,6 +184,49 @@ int64_t conv1d_output_frames(const Conv1dConfig & config, int64_t input_frames) 
     return (input_frames + 2 * config.padding - config.dilation * (config.kernel_size - 1) - 1) / config.stride + 1;
 }
 
+ggml_tensor * build_conv1d_graph(
+    core::ModuleBuildContext & ctx,
+    const Conv1dConfig & config,
+    const core::TensorValue & weight,
+    const core::TensorValue & input) {
+    if (weight.type != GGML_TYPE_F32) {
+        return ggml_conv_1d(
+            ctx.ggml,
+            weight.tensor,
+            input.tensor,
+            config.stride,
+            config.padding,
+            config.dilation);
+    }
+
+    // ggml_conv_1d lowers every non-BF16 input through an F16 im2col buffer.
+    // Dense MiniMax components carry F32 convolution weights and require the
+    // input columns to remain F32 for the committed numerical parity gates.
+    ggml_tensor * columns = ggml_im2col(
+        ctx.ggml,
+        weight.tensor,
+        input.tensor,
+        config.stride,
+        0,
+        config.padding,
+        0,
+        config.dilation,
+        0,
+        false,
+        GGML_TYPE_F32);
+    ggml_tensor * result = ggml_mul_mat(
+        ctx.ggml,
+        ggml_reshape_2d(ctx.ggml, columns, columns->ne[0], columns->ne[2] * columns->ne[1]),
+        ggml_reshape_2d(ctx.ggml, weight.tensor, weight.tensor->ne[0] * weight.tensor->ne[1], weight.tensor->ne[2]));
+    ggml_mul_mat_set_prec(result, GGML_PREC_F32);
+
+    if (columns->ne[2] == 1) {
+        return ggml_reshape_3d(ctx.ggml, result, columns->ne[1], weight.tensor->ne[2], 1);
+    }
+    result = ggml_reshape_3d(ctx.ggml, result, columns->ne[1], columns->ne[2], weight.tensor->ne[2]);
+    return ggml_cont(ctx.ggml, ggml_permute(ctx.ggml, result, 0, 2, 1, 3));
+}
+
 int64_t conv2d_output_dim(int64_t input, int kernel, int stride, int padding, int dilation) {
     return (input + 2 * padding - dilation * (kernel - 1) - 1) / stride + 1;
 }
@@ -350,13 +393,7 @@ core::TensorValue Conv1dModule::build(
     core::TensorValue output;
     if (input.shape.dims[0] == 1) {
         output = core::wrap_tensor(
-            ggml_conv_1d(
-                ctx.ggml,
-                weight_contiguous.tensor,
-                input_contiguous.tensor,
-                config_.stride,
-                config_.padding,
-                config_.dilation),
+            build_conv1d_graph(ctx, config_, weight_contiguous, input_contiguous),
             output_shape,
             GGML_TYPE_F32);
     } else {
@@ -368,13 +405,7 @@ core::TensorValue Conv1dModule::build(
                 config_.in_channels,
                 input.shape.dims[2]);
             auto batch_output = core::wrap_tensor(
-                ggml_conv_1d(
-                    ctx.ggml,
-                    weight_contiguous.tensor,
-                    matrix_input.tensor,
-                    config_.stride,
-                    config_.padding,
-                    config_.dilation),
+                build_conv1d_graph(ctx, config_, weight_contiguous, matrix_input),
                 core::TensorShape::from_dims({1, config_.out_channels, output_shape.dims[2]}),
                 GGML_TYPE_F32);
             output = output.valid() ? ConcatModule({0}).build(ctx, output, batch_output) : batch_output;

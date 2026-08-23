@@ -88,8 +88,10 @@ core::TensorValue LinearModule::build(
     core::TensorValue matrix_input = core::reshape_tensor(ctx, contiguous_input, matrix_input_shape);
 
     ggml_tensor * projected_raw = ggml_mul_mat(ctx.ggml, weights.weight.tensor, matrix_input.tensor);
-    if (config_.precision != GGML_PREC_DEFAULT) {
-        ggml_mul_mat_set_prec(projected_raw, config_.precision);
+    if (config_.precision != GGML_PREC_DEFAULT || weights.weight.type == GGML_TYPE_F32) {
+        ggml_mul_mat_set_prec(
+            projected_raw,
+            config_.precision != GGML_PREC_DEFAULT ? config_.precision : GGML_PREC_F32);
     }
     core::TensorValue projected = core::wrap_tensor(
         projected_raw,

@@ -218,3 +218,28 @@ Diffusers/CUDA parity, all quantized-profile smokes, and CUDA resume evidence.
 
 Next: provision one NVIDIA H100 with 80 GiB VRAM and retain at least 100 GiB of
 workspace storage for the existing source/GGUF artifacts plus parity fixtures.
+
+## 2026-08-23 — H100 dense CUDA parity green
+
+- Built the dynamic CUDA backend with CUDA 13.0.88 on an NVIDIA H100 80GB and
+  passed all 12 native/Python contract tests. The runtime discovered the H100
+  as CUDA device zero with compute capability 9.0.
+- Corrected the GPU parity environment to use NumPy 1.26 because the previous
+  unconstrained NumPy 2 requirement was incompatible with the oracle's SciPy
+  import path.
+- The first dense run exposed three precision lowerings hidden by CPU-only
+  validation: F32 Conv1d used F16 im2col columns, dense DiT selected flash
+  attention, and CUDA ignored `GGML_PREC_F32` when choosing its custom matmul
+  kernel and cuBLAS math mode.
+- F32 Conv1d now preserves F32 columns, dense DiT uses explicit attention, and
+  the pinned GGML fork routes explicitly strict F32 CUDA matmuls through
+  pedantic cuBLAS. Quantized and default operations retain their accelerated
+  paths. The GGML fix is commit
+  `2f50f0164352c6aa301da49a4e344c2379c82afd`.
+- The fresh end-to-end dense runner passed without relaxing a threshold:
+  condition max error `3.16650e-7`, DiT `6.67572e-6`, and vocoder
+  `2.21223e-4`. Compact evidence is committed at
+  `validation/evidence/h100-dense.json`; raw F32 fixtures remain ignored.
+
+Next: rebuild the CUDA CLI/Cantor harness, run exact resume and rate smokes,
+then execute all six mixed-component quantized profiles covering 18 GGUFs.

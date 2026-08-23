@@ -14,6 +14,9 @@ assert set(fixture["components"]) == {"condition", "dit", "vocoder"}
 assert fixture["components"]["condition"]["output_shape"] == [1, 10, 2048]
 assert fixture["components"]["vocoder"]["output_shape"] == [1, 2, 1024]
 
+requirements = (root / "parity" / "requirements-gpu.txt").read_text(encoding="utf-8").splitlines()
+assert "numpy>=1.26,<2.0" in requirements
+
 spec = importlib.util.spec_from_file_location("compare", root / "parity" / "compare.py")
 module = importlib.util.module_from_spec(spec)
 assert spec.loader is not None

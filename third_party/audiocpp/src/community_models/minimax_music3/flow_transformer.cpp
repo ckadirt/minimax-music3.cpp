@@ -219,6 +219,8 @@ struct MiniMaxMusic3FlowTransformerRuntime::Impl {
         temb = core::reshape_tensor(ctx, temb, core::TensorShape::from_dims({2, 1, inner}));
         x = modules::ConcatModule({1}).build(ctx, temb, x);
 
+        const bool dense_f32 = weights.proj_in.weight.type == GGML_TYPE_F32;
+
         for (const auto & block : weights.blocks) {
             auto normed = modules::LayerNormModule({inner, 1.0e-5F, true, true, false}).build(ctx, x, block.norm1);
             auto q = modules::LinearModule({inner, inner, false}).build(ctx, normed, block.q);
@@ -234,7 +236,7 @@ struct MiniMaxMusic3FlowTransformerRuntime::Impl {
             v = modules::TransposeModule({{0, 2, 1, 3}, v.shape.rank}).build(ctx, v);
             auto attn = modules::ScaledDotProductAttentionModule({
                 config.head_dim,
-                core::uses_ggml_cuda_or_hip_backend(execution.backend_type())
+                core::uses_ggml_cuda_or_hip_backend(execution.backend_type()) && !dense_f32
                     ? modules::ScaledDotProductAttentionLowering::FlashPreserveViews
                     : modules::ScaledDotProductAttentionLowering::Explicit,
                 GGML_PREC_F32,

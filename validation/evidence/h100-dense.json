@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "status": "pass",
+  "hardware": {
+    "device": "NVIDIA H100 80GB HBM3",
+    "compute_capability": "9.0",
+    "driver": "580.173.02",
+    "cuda_toolkit": "13.0.88"
+  },
+  "software": {
+    "torch": "2.8.0+cu128",
+    "numpy": "1.26.4",
+    "diffusers": "0.40.0.dev0@dafe3733fcfdbf3c48915fe77be3aef65b5d6a2d",
+    "ggml": "2f50f0164352c6aa301da49a4e344c2379c82afd"
+  },
+  "run": {
+    "binary_sha256": "5f500ff06ddce7b67244e3c8159045613bc11e2ee489c84b80e9e8ecd0cd5dab",
+    "summary_sha256": "3e2281eefaca16885a7c886b72a60ac58cbd41d7399fdbf57465b354f21ea05a",
+    "fixture_spec_sha256": "e188264d14b0e7d5de81b7338375dd83a13905719e2a3b72245bb78246c6f0d0"
+  },
+  "components": {
+    "condition": {
+      "max_abs": 3.166496753692627e-07,
+      "relative_rms": 1.1332774479812532e-06,
+      "cosine": 0.9999999999993427
+    },
+    "dit": {
+      "max_abs": 6.67572021484375e-06,
+      "relative_rms": 1.998054504150545e-06,
+      "cosine": 0.9999999999980205
+    },
+    "vocoder": {
+      "max_abs": 0.0002212226390838623,
+      "relative_rms": 0.000815729609583486,
+      "cosine": 0.9999998587494149
+    }
+  }
+}

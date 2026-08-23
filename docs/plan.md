@@ -8,11 +8,16 @@
 | `huggingface/diffusers` | `dafe3733fcfdbf3c48915fe77be3aef65b5d6a2d` | Componentized Python oracle |
 | `sgl-project/sglang-omni` | `5b2d8852fbed855fc07ce04eb1f105fa4294f34f` | Serving prompt, RNG, chunking oracle |
 | `0xShug0/audio.cpp` | `62735eafd96294c52d6c4607f5f38ac55be54f06` | Audited native implementation seed |
-| `ckadirt/ggml` | `70081fdfc8685b60477b54d9d11cd679c5a00cb1` | Portable compute backends |
+| `ckadirt/ggml` | `2f50f0164352c6aa301da49a4e344c2379c82afd` | Portable compute backends with strict CUDA F32 matmul |
 
 The converter downloads only the componentized inference files. The legacy
 `qwen_7B`, `dav.pth`, `flowmatching_vae.pth`, demo assets, and training-only
 files are excluded.
+
+The staged GGUFs retain `70081fdfc8685b60477b54d9d11cd679c5a00cb1`
+as their converter provenance. The later GGML commit changes only CUDA runtime
+execution and does not change GGUF serialization, tensor conversion, or model
+payload bytes.
 
 ## Milestones
 
