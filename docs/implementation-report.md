@@ -199,3 +199,22 @@ build-minimal-make/bin/minimax-cantor-smoke --model artifacts/gguf \
 
 Next: run the final portable CI matrix, then move to one H100 80 GiB for dense
 Diffusers/CUDA parity, all quantized-profile smokes, and CUDA resume evidence.
+
+## 2026-08-23 — final portable build matrix green
+
+- GitHub Actions run
+  [32656223224](https://github.com/ckadirt/minimax-music3.cpp/actions/runs/32656223224)
+  passed on commit `747bdc36e2254170e65a15d03b3387627d6a3fb5`.
+- Green jobs: Linux CPU, Linux Vulkan, Linux CUDA, macOS arm64 Metal,
+  Windows x64 CPU, Android arm64 CPU, and Android arm64 Vulkan. Each job built
+  the requested backend and asserted the Cantor ABI/backend surface; host jobs
+  ran all weightless tests through their available runtime or CPU fallback.
+- The matrix proves portable compilation, linking, plugin discovery, and ABI
+  packaging. It does not claim real-model CUDA/Vulkan/Metal/Android numerical
+  validation; those remain explicit release gates.
+- The repository is ready for the GPU validation phase with dense oracle,
+  repeatability, Cantor resume, and complete quantized-profile runners already
+  committed.
+
+Next: provision one NVIDIA H100 with 80 GiB VRAM and retain at least 100 GiB of
+workspace storage for the existing source/GGUF artifacts plus parity fixtures.
