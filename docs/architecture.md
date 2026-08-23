@@ -1,0 +1,47 @@
+# Architecture contract
+
+## Model stages
+
+MiniMax Music 3 generates one autoregressive music frame at 25 frames per
+second. A 36-layer Qwen3 model predicts the semantic code, then a four-layer
+depth decoder predicts seven residual RVQ codes. Synthesis consumes the eight
+4096-wide final hidden states, not only the discrete codes.
+
+For each acoustic window, the condition encoder learns a weighted sum over the
+eight hidden states, applies a 4096-to-2048 convolution, and nearest-neighbor
+resizes the result to the 44.1 kHz latent timeline. A 36-layer flow transformer
+integrates 128-channel latents. The vocoder upsamples each latent frame by 512
+samples and produces stereo 44.1 kHz audio.
+
+| Property | Value |
+| --- | ---: |
+| Prompt limit | 5,000 tokens |
+| AR context | 10,240 positions |
+| Maximum audio frames | 9,000 |
+| Maximum duration | 300 seconds |
+| RVQ codebooks | 8 |
+| Semantic vocabulary | 16,384 entries |
+| Residual vocabulary | 1,024 entries |
+| Acoustic window/hop | 200 / 100 AR frames |
+| Default solver | 30 Euler steps |
+| Default AR/flow CFG | 1.5 / 1.7 |
+| Native output | 44,100 Hz stereo |
+
+## Residency and durable boundaries
+
+The runtime owns five independently selectable components: `lm`, `rvq`,
+`condition`, `dit`, and `vae`.
+
+- CODES loads LM/RVQ and, after AR completion, condition projection weights.
+  A paused prefix stores codes and RNG state and rebuilds KV state by replay.
+- A completed CODES state stores window-specific, pre-resize BF16 condition
+  projections. This is mathematically equivalent to rounding the resized
+  nearest-neighbor output and reduces the five-minute boundary from roughly
+  562.5 MiB of raw BF16 hidden states to roughly 69.5 MiB.
+- DIFFUSE loads only the DiT and stores completed latents, the current Euler
+  position, overlap carry, RNG state, settings, and component identities.
+- DECODE loads only the VAE. Cancellation retries from the durable DIFFUSE
+  boundary rather than serializing a partial waveform graph.
+
+Every boundary is versioned, little-endian, length-delimited, checksummed, and
+stamped with the exact component SHA-256 values and canonical request.

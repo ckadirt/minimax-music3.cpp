@@ -1,0 +1,33 @@
+# Local credentials and editor state
+.env
+.env.*
+!.env.example
+.idea/
+.vscode/
+
+# Build and test output
+build*/
+dist/
+Testing/
+.cache/
+.pytest_cache/
+__pycache__/
+*.pyc
+
+# Checkpoints, conversion staging, parity fixtures, and generated audio
+models/
+weights/
+artifacts/
+staging/
+*.gguf
+*.safetensors
+*.pth
+*.pt
+*.wav
+*.npy
+*.npz
+*.resume
+
+# Generated manifests are staged with model artifacts, not source.
+*.gguf.manifest.json
+*.gguf.sha256

@@ -1,0 +1,11 @@
+minimax-music3.cpp
+Copyright 2026 the minimax-music3.cpp contributors
+
+This product includes software developed by ShugoAI LLC for audio.cpp,
+Copyright 2026 ShugoAI LLC, licensed under the Apache License 2.0.
+
+This product uses GGML and tokenizer/Unicode components under their respective
+licenses. See THIRD_PARTY_NOTICES.md.
+
+MiniMax Music 3 model weights are not covered by this source-code license.
+They are governed by the MiniMax Music 3 Community License.
