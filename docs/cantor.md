@@ -66,6 +66,26 @@ Stage blobs are allocated by the engine and released with
 `cantor_engine_free_blob`. Audio remains owned by the context until the next
 stage call or context destruction. All ABI entry points contain exceptions;
 failure details are available through the thread-local error code/string.
-`cantor_engine_resident_modules` reports the current stage module count and
+`cantor_engine_resident_modules` reports the live weight-owning module count and
 `cantor_engine_resident_bytes` reports the selected backend's used-memory
 snapshot when that backend exposes one.
+
+
+## Model residency
+
+The node's `[engine] keep_loaded = true` retains lazily loaded AR (LM/RVQ),
+condition encoder, Flow and vocoder runtimes across stages and generations.
+Their weights stay on the selected backend (RAM on CPU, device buffers on
+GPU). Request graphs and KV state are released at stage boundaries, including
+pauses; a stage exception also discards that stage's runtime. A subsequent
+request rebuilds its graphs, conditioning and sampler state.
+
+With `keep_loaded = false` (the default), each stage releases its runtime and
+weights when finished. Shared asset metadata and the execution backend remain
+context-owned in either mode. `vram_budget_bytes` is not implemented: retention
+requires room for all loaded weights plus the current stage's working memory.
+`cantor_engine_free` releases all retained runtimes before their backend.
+
+GPU validation should cover two sequential generations with changed prompts,
+seeds and duration, pause/resume, and both values of `keep_loaded`. Weightless
+lifecycle tests do not establish GPU numerical parity or peak memory usage.

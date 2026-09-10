@@ -1,4 +1,5 @@
 #include "cantor_engine.h"
+#include "cantor-residency.h"
 
 #include "minimax-checkpoint.h"
 #include "minimax-request.h"
@@ -45,7 +46,11 @@ struct cantor_ctx {
     std::vector<float> audio;
     int audio_samples = 0;
     int audio_rate = 0;
-    int resident_modules = 0;
+    // Declared after execution: runtimes and their weights must die first.
+    std::unique_ptr<mm3::MiniMaxMusic3ArRuntime> ar;
+    std::unique_ptr<mm3::MiniMaxMusic3ConditionEncoderRuntime> condition;
+    std::unique_ptr<mm3::MiniMaxMusic3FlowSamplerRuntime> flow;
+    std::unique_ptr<mm3::MiniMaxMusic3VocoderRuntime> vocoder;
 };
 
 namespace {
@@ -527,10 +532,13 @@ cantor_status run_codes(cantor_ctx & context, const std::uint8_t * input, std::s
         }
     }
     std::uint64_t unused_rng_offset = 0;
-    context.resident_modules = 2;
-    mm3::MiniMaxMusic3ArRuntime ar(
-        context.assets, *context.execution, graph_arena_bytes, weight_context_bytes,
-        engine::assets::TensorStorageType::Native);
+    minimax::runtime_lease<mm3::MiniMaxMusic3ArRuntime> ar_lease(
+        context.ar, context.options.keep_loaded != 0, [&] {
+            return std::make_unique<mm3::MiniMaxMusic3ArRuntime>(
+                context.assets, *context.execution, graph_arena_bytes, weight_context_bytes,
+                engine::assets::TensorStorageType::Native);
+        });
+    auto & ar = ar_lease.get();
     auto ar_result = ar.generate_frame_hiddens_resumable(
         native,
         target_frames,
@@ -540,8 +548,7 @@ cantor_status run_codes(cantor_ctx & context, const std::uint8_t * input, std::s
             return is_cancelled(should_cancel, userdata);
         },
         unused_rng_offset);
-    ar.release_runtime_graphs();
-    context.resident_modules = 0;
+    ar_lease.finish();
     if (!ar_result.completed) {
         const std::string canonical = minimax::request_io::serialize(request);
         const auto blob = minimax::checkpoint::encode(codes_pause_magic, CANTOR_STAGE_CODES, {
@@ -556,16 +563,18 @@ cantor_status run_codes(cantor_ctx & context, const std::uint8_t * input, std::s
 
     const std::int64_t generated_frames = static_cast<std::int64_t>(ar_result.frame_hiddens.size()) / (8 * 4096);
     const auto starts = chunk_starts(generated_frames);
-    context.resident_modules = 1;
-    mm3::MiniMaxMusic3ConditionEncoderRuntime condition(
-        context.assets, *context.execution, graph_arena_bytes, weight_context_bytes,
-        engine::assets::TensorStorageType::Native);
+    minimax::runtime_lease<mm3::MiniMaxMusic3ConditionEncoderRuntime> condition_lease(
+        context.condition, context.options.keep_loaded != 0, [&] {
+            return std::make_unique<mm3::MiniMaxMusic3ConditionEncoderRuntime>(
+                context.assets, *context.execution, graph_arena_bytes, weight_context_bytes,
+                engine::assets::TensorStorageType::Native);
+        });
+    auto & condition = condition_lease.get();
     std::vector<condition_chunk> conditions;
     conditions.reserve(starts.size());
     for (std::size_t index = 0; index != starts.size(); ++index) {
         if (is_cancelled(should_cancel, userdata)) {
-            condition.release_runtime_graphs();
-            context.resident_modules = 0;
+            condition_lease.finish();
             const std::string canonical = minimax::request_io::serialize(request);
             const auto blob = minimax::checkpoint::encode(codes_pause_magic, CANTOR_STAGE_CODES, {
                 {minimax::checkpoint::section_kind::request_json, {canonical.begin(), canonical.end()}},
@@ -581,8 +590,7 @@ cantor_status run_codes(cantor_ctx & context, const std::uint8_t * input, std::s
         engine::core::round_f32_to_bf16_in_place(projected);
         conditions.push_back({frames, std::move(projected)});
     }
-    condition.release_runtime_graphs();
-    context.resident_modules = 0;
+    condition_lease.finish();
     const std::string canonical = minimax::request_io::serialize(request);
     const auto blob = minimax::checkpoint::encode(codes_done_magic, CANTOR_STAGE_CODES, {
         {minimax::checkpoint::section_kind::request_json, {canonical.begin(), canonical.end()}},
@@ -676,10 +684,13 @@ cantor_status run_flow(cantor_ctx & context, const std::uint8_t * input, std::si
 
     auto native = native_request(request);
     const auto policy = mm3::minimax_music3_flow_sampling_policy();
-    context.resident_modules = 1;
-    mm3::MiniMaxMusic3FlowSamplerRuntime flow(
-        context.assets, *context.execution, graph_arena_bytes, weight_context_bytes,
-        engine::assets::TensorStorageType::Native);
+    minimax::runtime_lease<mm3::MiniMaxMusic3FlowSamplerRuntime> flow_lease(
+        context.flow, context.options.keep_loaded != 0, [&] {
+            return std::make_unique<mm3::MiniMaxMusic3FlowSamplerRuntime>(
+                context.assets, *context.execution, graph_arena_bytes, weight_context_bytes,
+                engine::assets::TensorStorageType::Native);
+        });
+    auto & flow = flow_lease.get();
     for (std::size_t index = state.chunk_index; index != conditions.size(); ++index) {
         const auto resized = resize_condition(conditions[index]);
         const auto frames = static_cast<std::int64_t>(resized.size() / 2048U);
@@ -705,8 +716,7 @@ cantor_status run_flow(cantor_ctx & context, const std::uint8_t * input, std::si
                 return is_cancelled(should_cancel, userdata);
             });
         if (!result.completed) {
-            flow.release_runtime_graphs();
-            context.resident_modules = 0;
+            flow_lease.finish();
             const auto blob = minimax::checkpoint::encode(flow_pause_magic, CANTOR_STAGE_DIFFUSE, {
                 {minimax::checkpoint::section_kind::source_boundary, state.codes_boundary},
                 {minimax::checkpoint::section_kind::completed_latents_f32, encode_latents(state.completed)},
@@ -725,8 +735,7 @@ cantor_status run_flow(cantor_ctx & context, const std::uint8_t * input, std::si
         state.active.clear();
         state.completed_steps = 0;
     }
-    flow.release_runtime_graphs();
-    context.resident_modules = 0;
+    flow_lease.finish();
     const auto blob = minimax::checkpoint::encode(flow_done_magic, CANTOR_STAGE_DIFFUSE, {
         {minimax::checkpoint::section_kind::source_boundary, state.codes_boundary},
         {minimax::checkpoint::section_kind::completed_latents_f32, encode_latents(state.completed)},
@@ -785,16 +794,18 @@ cantor_status run_decode(cantor_ctx & context, const std::uint8_t * input, std::
     context.audio.clear();
     context.audio_samples = 0;
     context.audio_rate = 0;
-    context.resident_modules = 1;
-    mm3::MiniMaxMusic3VocoderRuntime vocoder(
-        context.assets, *context.execution, graph_arena_bytes, weight_context_bytes,
-        engine::assets::TensorStorageType::Native);
+    minimax::runtime_lease<mm3::MiniMaxMusic3VocoderRuntime> vocoder_lease(
+        context.vocoder, context.options.keep_loaded != 0, [&] {
+            return std::make_unique<mm3::MiniMaxMusic3VocoderRuntime>(
+                context.assets, *context.execution, graph_arena_bytes, weight_context_bytes,
+                engine::assets::TensorStorageType::Native);
+        });
+    auto & vocoder = vocoder_lease.get();
     std::vector<float> interleaved;
     for (std::size_t index = 0; index != latents.size(); ++index) {
         progress(on_progress, userdata, CANTOR_STAGE_DECODE, index, latents.size());
         if (is_cancelled(should_cancel, userdata)) {
-            vocoder.release_runtime_graphs();
-            context.resident_modules = 0;
+            vocoder_lease.finish();
             set_error(CANTOR_ERR_CANCEL, "[MiniMax ABI] DECODE paused; retry the durable DIFFUSE boundary");
             return CANTOR_PAUSED;
         }
@@ -804,8 +815,7 @@ cantor_status run_decode(cantor_ctx & context, const std::uint8_t * input, std::
         auto cropped = crop_audio(audio, left, right);
         interleaved.insert(interleaved.end(), cropped.begin(), cropped.end());
     }
-    vocoder.release_runtime_graphs();
-    context.resident_modules = 0;
+    vocoder_lease.finish();
 
     std::vector<float> left(interleaved.size() / 2U);
     std::vector<float> right(interleaved.size() / 2U);
@@ -931,5 +941,7 @@ extern "C" std::uint64_t cantor_engine_resident_bytes(cantor_ctx * context) {
 }
 
 extern "C" int cantor_engine_resident_modules(cantor_ctx * context) {
-    return context == nullptr ? 0 : context->resident_modules;
+    if (context == nullptr) return 0;
+    return (context->ar ? 2 : 0) + (context->condition ? 1 : 0) +
+           (context->flow ? 1 : 0) + (context->vocoder ? 1 : 0);
 }

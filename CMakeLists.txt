@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(minimax-music3
-    VERSION 0.1.0
+    VERSION 0.1.1
     DESCRIPTION "Portable MiniMax Music 3 inference with GGML"
     LANGUAGES C CXX)
 

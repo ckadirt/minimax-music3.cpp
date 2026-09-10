@@ -65,3 +65,8 @@ if(MINIMAX_DIRECTORY_TESTS)
     set_tests_properties(${MINIMAX_DIRECTORY_TESTS} PROPERTIES
         WORKING_DIRECTORY "$<TARGET_FILE_DIR:minimax-cli>")
 endif()
+
+add_executable(test-residency test-residency.cpp)
+target_compile_features(test-residency PRIVATE cxx_std_17)
+target_include_directories(test-residency PRIVATE ${PROJECT_SOURCE_DIR}/src)
+add_test(NAME residency COMMAND test-residency)
