@@ -46,6 +46,7 @@ struct cantor_ctx {
     std::vector<float> audio;
     int audio_samples = 0;
     int audio_rate = 0;
+    double duration_seconds = 0.0;
     // Declared after execution: runtimes and their weights must die first.
     std::unique_ptr<mm3::MiniMaxMusic3ArRuntime> ar;
     std::unique_ptr<mm3::MiniMaxMusic3ConditionEncoderRuntime> condition;
@@ -517,6 +518,7 @@ cantor_status run_codes(cantor_ctx & context, const std::uint8_t * input, std::s
     } else {
         request = minimax::request_io::parse(std::string(reinterpret_cast<const char *>(input), input_size));
     }
+    context.duration_seconds = request.duration_seconds;
     ensure_components(context);
 
     const auto native = native_request(request);
@@ -944,4 +946,10 @@ extern "C" int cantor_engine_resident_modules(cantor_ctx * context) {
     if (context == nullptr) return 0;
     return (context->ar ? 2 : 0) + (context->condition ? 1 : 0) +
            (context->flow ? 1 : 0) + (context->vocoder ? 1 : 0);
+}
+
+// Optional ABI-1 extension: lets hosts bound binary CODES state without parsing
+// model-specific checkpoint bytes. Zero means no accepted CODES request yet.
+extern "C" double cantor_engine_duration(cantor_ctx * context) {
+    return context ? context->duration_seconds : 0.0;
 }

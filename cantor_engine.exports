@@ -11,3 +11,4 @@ _cantor_engine_free_blob
 _cantor_engine_audio
 _cantor_engine_resident_bytes
 _cantor_engine_resident_modules
+_cantor_engine_duration

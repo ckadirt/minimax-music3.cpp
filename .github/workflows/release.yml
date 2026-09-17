@@ -89,7 +89,7 @@ jobs:
         run: |
           set -euo pipefail
           ctest --test-dir build --output-on-failure
-          test "$(nm -D --defined-only build/lib/libcantor_engine.so | awk '{print $3}' | grep -c '^cantor_engine_' || true)" -eq 13
+          test "$(nm -D --defined-only build/lib/libcantor_engine.so | awk '{print $3}' | grep -c '^cantor_engine_' || true)" -eq 14
           LD_LIBRARY_PATH="build/ggml/src:build/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" build/bin/minimax-cli --smoke cpu
       - name: Package relocatable backend
         id: package
@@ -171,7 +171,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(nm -gU build/lib/libcantor_engine.dylib | awk '{print $3}' | grep -c '^_cantor_engine_' || true)" -eq 13
+          test "$(nm -gU build/lib/libcantor_engine.dylib | awk '{print $3}' | grep -c '^_cantor_engine_' || true)" -eq 14
           version="${RELEASE_TAG#v}"
           root="minimax-music3-v${version}-macos-arm64-metal"
           mkdir -p "dist/$root"
@@ -318,7 +318,7 @@ jobs:
           set -euo pipefail
           engine=build/lib/libcantor_engine.so
           test -f "$engine"
-          test "$(readelf --dyn-syms --wide "$engine" | awk '{print $8}' | grep '^cantor_engine_' | sort -u | wc -l)" -eq 13
+          test "$(readelf --dyn-syms --wide "$engine" | awk '{print $8}' | grep '^cantor_engine_' | sort -u | wc -l)" -eq 14
           version="${RELEASE_TAG#v}"
           root="minimax-music3-v${version}-android-arm64-v8a-${{ matrix.backend }}"
           mkdir -p "dist/$root"

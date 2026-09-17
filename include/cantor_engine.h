@@ -94,6 +94,8 @@ CANTOR_API cantor_status cantor_engine_run_stage(cantor_ctx *       ctx,
 
 CANTOR_API void cantor_engine_free_blob(uint8_t * blob);
 CANTOR_API const float * cantor_engine_audio(cantor_ctx * ctx, int * n_samples, int * sample_rate);
+// Optional ABI-1 extension: accepted request duration after CODES.
+CANTOR_API double cantor_engine_duration(cantor_ctx * ctx);
 CANTOR_API uint64_t cantor_engine_resident_bytes(cantor_ctx * ctx);
 CANTOR_API int cantor_engine_resident_modules(cantor_ctx * ctx);
 

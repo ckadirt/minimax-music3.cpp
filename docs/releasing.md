@@ -31,7 +31,7 @@ as real-model backend validation.
 
 `.github/workflows/release.yml` runs for a published Release or an explicit
 existing tag. It produces GitHub assets for Linux CPU/CUDA/Vulkan, macOS Metal,
-Windows CPU/Vulkan, and Android CPU/Vulkan. Each job checks the 13-symbol ABI,
+Windows CPU/Vulkan, and Android CPU/Vulkan. Each job checks the 14-symbol ABI (13 required plus optional duration query),
 packages licenses and the public header, writes a SHA-256 sidecar, and aborts
 if an asset of the same name already exists.
 

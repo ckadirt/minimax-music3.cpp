@@ -11,6 +11,7 @@ CANTOR_ENGINE_1 {
         cantor_engine_run_stage;
         cantor_engine_free_blob;
         cantor_engine_audio;
+        cantor_engine_duration;
         cantor_engine_resident_bytes;
         cantor_engine_resident_modules;
     local:

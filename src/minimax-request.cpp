@@ -374,14 +374,22 @@ generation_request parse(const std::string & json) {
     if (json.size() > max_request_bytes) fail("JSON exceeds the 1 MiB limit");
     const value root = reader(json).parse();
     if (root.type != value::kind::object) fail("request must be a JSON object");
-    reject_unknown(root, {"lyrics", "description", "duration_seconds", "seed", "cfg_scale",
+    reject_unknown(root, {"lyrics", "caption", "description", "duration", "duration_seconds", "seed", "cfg_scale",
+                          "inference_steps", "guidance_scale", "top_k",
                           "sampling", "flow", "output_sample_rate"}, "request");
 
     generation_request result;
     result.lyrics = required(root, "lyrics", value::kind::string).string;
-    result.description = required(root, "description", value::kind::string).string;
-    const value & duration = required(root, "duration_seconds", value::kind::number);
-    result.duration_seconds = duration.number;
+    if (lookup(root, "caption") && lookup(root, "description")) fail("use only one of caption and description");
+    if (lookup(root, "duration") && lookup(root, "duration_seconds")) fail("use only one of duration and duration_seconds");
+    result.description = required(root, lookup(root, "caption") ? "caption" : "description", value::kind::string).string;
+    if (const value * duration = lookup(root, "duration") ? lookup(root, "duration") : lookup(root, "duration_seconds")) {
+        if (duration->type != value::kind::number) fail("duration must be a number");
+        result.duration_seconds = duration->number;
+    }
+    if (const value * item = lookup(root, "inference_steps")) result.euler_steps = exact_size(*item, "inference_steps");
+    if (const value * item = lookup(root, "guidance_scale")) result.flow_cfg_scale = finite_float(*item, "guidance_scale");
+    if (const value * item = lookup(root, "top_k")) result.top_k = exact_size(*item, "top_k");
     if (const value * item = lookup(root, "seed")) result.seed = exact_u64(*item, "seed");
     if (const value * item = lookup(root, "cfg_scale")) result.ar_cfg_scale = finite_float(*item, "cfg_scale");
     if (const value * item = lookup(root, "output_sample_rate")) {

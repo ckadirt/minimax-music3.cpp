@@ -38,7 +38,12 @@ int main() {
     assert(!defaults.flow_seed_present);
 
     rejects(R"({"lyrics":"la","description":"voice","duration_seconds":10,"typo":1})");
-    rejects(R"({"lyrics":"la","description":"voice","duration":10})");
+    const auto shared = minimax::request_io::parse(R"({"lyrics":"la","caption":"voice","duration":10,"inference_steps":12,"guidance_scale":2,"top_k":30})");
+    assert(shared.description == "voice" && shared.duration_seconds == 10);
+    assert(shared.euler_steps == 12 && shared.flow_cfg_scale == 2 && shared.top_k == 30);
+    assert(minimax::request_io::parse(R"({"lyrics":"la","caption":"voice"})").duration_seconds == 20);
+    rejects(R"({"lyrics":"la","caption":"a","description":"b"})");
+    rejects(R"({"lyrics":"la","caption":"a","duration":10,"duration_seconds":20})");
     rejects(R"({"lyrics":"la","description":"voice","duration_seconds":301})");
     rejects(R"({"lyrics":"la","description":"voice","duration_seconds":10,"seed":1.0})");
     rejects(R"({"lyrics":"la","lyrics":"dup","description":"voice","duration_seconds":10})");

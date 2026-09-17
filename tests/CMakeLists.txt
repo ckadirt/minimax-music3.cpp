@@ -70,3 +70,7 @@ add_executable(test-residency test-residency.cpp)
 target_compile_features(test-residency PRIVATE cxx_std_17)
 target_include_directories(test-residency PRIVATE ${PROJECT_SOURCE_DIR}/src)
 add_test(NAME residency COMMAND test-residency)
+
+if(NOT MSVC)
+    target_compile_options(test-request PRIVATE -UNDEBUG)
+endif()

@@ -89,3 +89,16 @@ requires room for all loaded weights plus the current stage's working memory.
 GPU validation should cover two sequential generations with changed prompts,
 seeds and duration, pause/resume, and both values of `keep_loaded`. Weightless
 lifecycle tests do not establish GPU numerical parity or peak memory usage.
+
+## Shared request fields
+
+Accepts `caption`, `lyrics`, and optional `duration` (20 seconds by default).
+Legacy `description` and `duration_seconds` remain readable, including inside
+existing binary checkpoints. Lyrics are required; this model has no automatic
+lyric writer or supported empty-lyrics mode. Flat `inference_steps`,
+`guidance_scale`, `cfg_scale`, `top_k` and `output_sample_rate` controls can be
+advertised by the Cantor catalog. Native nested controls remain supported.
+
+`cantor_engine_duration(ctx)` is an optional ABI-1 extension returning the
+accepted CODES request duration. Hosts use it for the pre-diffusion duration
+ceiling without interpreting the unchanged binary checkpoint format.
