@@ -30,6 +30,17 @@ if(GGML_CUDA AND NOT DEFINED GGML_CUDA_NCCL)
 endif()
 
 add_subdirectory(ggml)
+
+# Every engine family ships its own ggml into a node process that loads all of
+# them and never unloads any. Identical SONAMEs let whichever family loads
+# first satisfy every later family's DT_NEEDED, so an engine silently runs on a
+# ggml it was not built against -- a different version, with different compile
+# definitions. Give this family's ggml a name no other family can answer to.
+# The backend scanner globs libggml-<backend>-*.so, so these names stay clear
+# of any backend it probes for.
+set_target_properties(ggml-base PROPERTIES OUTPUT_NAME ggml-base-minimax)
+set_target_properties(ggml      PROPERTIES OUTPUT_NAME ggml-minimax)
+
 find_package(Threads REQUIRED)
 
 # Android's NDK provides the Vulkan loader and C headers but not vulkan.hpp.
