@@ -1502,7 +1502,9 @@ std::shared_ptr<const TensorSource> open_tensor_source(const std::filesystem::pa
     if (extension == ".safetensors") {
         return std::make_shared<SafeTensorSource>(path);
     }
-    if (extension == ".gguf") {
+    // The extension decides first because it costs nothing; a file with no
+    // extension, as a content-addressed store produces, is then sniffed.
+    if (extension == ".gguf" || engine::io::has_gguf_magic(path)) {
         return std::make_shared<GgufTensorSource>(path);
     }
     throw std::runtime_error("unsupported tensor source format: " + path.string());
@@ -1727,7 +1729,12 @@ PreparedModelDirectory prepare_model_directory(const std::filesystem::path & mod
     } else {
         throw std::runtime_error("model path does not exist: " + model_path.string());
     }
-    if (engine::io::is_existing_file(gguf_path) && lower_ascii(gguf_path.extension().string()) == ".gguf") {
+    // Recognising the GGUF here is what makes its embedded sidecars reachable,
+    // so a blob with no extension has to be sniffed rather than skipped: the
+    // fall-through treats the parent directory as the model root, and a
+    // content-addressed store has no tokenizer or configs to find there.
+    if (engine::io::is_existing_file(gguf_path) &&
+        (lower_ascii(gguf_path.extension().string()) == ".gguf" || engine::io::has_gguf_magic(gguf_path))) {
         const auto canonical_gguf = std::filesystem::weakly_canonical(gguf_path);
         if (gguf_has_embedded_sidecars(gguf_path)) {
             return {materialize_gguf_sidecars(gguf_path), canonical_gguf};

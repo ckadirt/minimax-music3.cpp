@@ -29,6 +29,11 @@ target_include_directories(test-checkpoint PRIVATE ${PROJECT_SOURCE_DIR}/src)
 add_test(NAME checkpoint-envelope COMMAND test-checkpoint)
 
 if(MINIMAX_BUILD_NATIVE_RUNTIME)
+    # Needs the audiocpp asset layer, which only exists with the native runtime.
+    add_executable(test-blob-paths test-blob-paths.cpp)
+    target_link_libraries(test-blob-paths PRIVATE minimax::core)
+    add_test(NAME blob-paths COMMAND test-blob-paths)
+
     add_executable(test-seed test-seed.cpp)
     target_link_libraries(test-seed PRIVATE minimax::native)
     add_test(NAME seed-contract COMMAND test-seed)

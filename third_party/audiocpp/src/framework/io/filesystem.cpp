@@ -1,5 +1,7 @@
 #include "engine/framework/io/filesystem.h"
 
+#include <array>
+#include <cstring>
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
@@ -14,6 +16,21 @@ bool is_existing_directory(const std::filesystem::path & path) {
 bool is_existing_file(const std::filesystem::path & path) {
     std::error_code ec;
     return std::filesystem::is_regular_file(path, ec);
+}
+
+bool has_gguf_magic(const std::filesystem::path & path) {
+    if (!is_existing_file(path)) {
+        return false;
+    }
+    std::ifstream input(path, std::ios::binary);
+    if (!input) {
+        return false;
+    }
+    std::array<char, 4> magic{};
+    if (!input.read(magic.data(), static_cast<std::streamsize>(magic.size()))) {
+        return false;
+    }
+    return std::memcmp(magic.data(), "GGUF", magic.size()) == 0;
 }
 
 std::filesystem::path require_directory(const std::filesystem::path & path, std::string_view role) {

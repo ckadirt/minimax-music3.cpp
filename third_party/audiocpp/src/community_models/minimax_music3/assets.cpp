@@ -190,7 +190,10 @@ std::shared_ptr<const MiniMaxMusic3Assets> load_minimax_music3_component_assets(
     const std::vector<std::filesystem::path> paths{
         language_model, rvq_depth_decoder, condition_encoder, flow_transformer, vocoder};
     for (const auto & path : paths) {
-        if (!engine::io::is_existing_file(path) || path.extension() != ".gguf") {
+        // Checked by content, not by name: Cantor hands us blobs from a
+        // content-addressed store, where every file is named for its digest
+        // and none of them carry a .gguf suffix.
+        if (!engine::io::has_gguf_magic(path)) {
             throw std::runtime_error("MiniMax Music 3 Cantor component is not an existing GGUF: " + path.string());
         }
     }
