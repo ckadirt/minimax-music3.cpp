@@ -102,7 +102,13 @@ jobs:
           stage="dist/$root"
           mkdir -p "$stage"
           install -m 0755 build/bin/minimax-cli build/lib/libcantor_engine.so "$stage/"
-          cp -a build/ggml/src/libggml.so* build/ggml/src/libggml-base.so* "$stage/"
+          # Globbed rather than named: CMakeLists gives this family's ggml its
+          # own SONAME (libggml-base-minimax) so three engine families can
+          # share one node process. Only the core libs live in ggml/src; the
+          # backends come from build/bin below.
+          core=(build/ggml/src/libggml*.so*)
+          test "${#core[@]}" -ge 2
+          cp -a "${core[@]}" "$stage/"
           cpu=(build/bin/libggml-cpu*.so*)
           test "${#cpu[@]}" -ge 2
           cp -a "${cpu[@]}" "$stage/"
